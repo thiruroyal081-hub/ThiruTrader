@@ -19,6 +19,61 @@ let journal=safeRead("thirut_trader_journal",[]);
 let selected=STOCKS[0], chart=null;
 const money=n=>"₹"+Number(n).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2});
 const pct=n=>(n>=0?"+":"")+n.toFixed(2)+"%";
+function backendBaseUrl(){
+  return (safeRead("thirut_trader_backend_url","")||"").trim().replace(/\/$/,"");
+}
+function setKiteMessage(message,tone="neutral"){
+  const el=$("kite-connection-message");if(!el)return;
+  el.textContent=message;el.className="connection-message connection-"+tone;
+}
+async function checkKiteStatus(){
+  const base=backendBaseUrl();
+  if(!base){setKiteMessage("Enter your separately hosted Flask backend URL first.");$("kite-status-badge").textContent="NOT CONFIGURED";return null}
+  setKiteMessage("Checking backend…");
+  try{
+    const response=await fetch(base+"/api/health",{credentials:"include"});
+    const data=await response.json();
+    if(!response.ok)throw new Error(data.message||"Backend health check failed.");
+    const configured=Boolean(data.kite_configured),authenticated=Boolean(data.authenticated);
+    $("kite-status-badge").textContent=authenticated?"KITE CONNECTED":configured?"READY TO CONNECT":"API NOT CONFIGURED";
+    setKiteMessage(authenticated?"Kite session is connected. You can request quotes if your account and API plan permit it.":configured?"Backend is reachable. Connect Kite to authorize this session.":"Backend is reachable, but Kite API credentials are not configured on the server.",authenticated?"success":configured?"neutral":"warning");
+    return data;
+  }catch(error){
+    $("kite-status-badge").textContent="BACKEND OFFLINE";
+    setKiteMessage("Could not reach backend. Check its URL, HTTPS, CORS and deployment settings. "+error.message,"warning");
+    return null;
+  }
+}
+async function connectKite(){
+  const base=backendBaseUrl();
+  if(!base){setKiteMessage("Enter and save your backend URL, then check the connection.","warning");return}
+  const status=await checkKiteStatus();
+  if(!status)return;
+  if(!status.kite_configured){setKiteMessage("Kite API credentials are not configured on your backend yet. Do not enter secrets on this website.","warning");return}
+  window.location.href=base+"/auth/login";
+}
+async function refreshSelectedQuote(){
+  const base=backendBaseUrl();
+  if(!base){setKiteMessage("Configure your backend URL first.","warning");return}
+  setKiteMessage("Requesting a quote for "+selected.symbol+"…");
+  try{
+    const response=await fetch(base+"/api/quote?i="+encodeURIComponent("NSE:"+selected.symbol),{credentials:"include"});
+    const data=await response.json();
+    if(!response.ok)throw new Error(data.message||data.error||"Quote request failed. Connect Kite first.");
+    const quote=data["NSE:"+selected.symbol];
+    if(!quote||!Number.isFinite(Number(quote.last_price)))throw new Error("No quote returned for this symbol. Check the NSE symbol and Kite access.");
+    const oldPrice=selected.price;
+    selected.price=Number(quote.last_price);
+    if(Number.isFinite(Number(quote.net_change))&&oldPrice>0)selected.change=Number(quote.net_change)/Math.max(.01,selected.price-Number(quote.net_change))*100;
+    if(quote.ohlc){if(Number.isFinite(Number(quote.ohlc.high)))selected.high=Number(quote.ohlc.high);if(Number.isFinite(Number(quote.ohlc.low)))selected.low=Number(quote.ohlc.low)}
+    $("selected-price").textContent=money(selected.price);$("selected-change").textContent=pct(selected.change);
+    $("selected-change").className=selected.change>=0?"positive":"negative";
+    $("selected-high").textContent=money(selected.high);$("selected-low").textContent=money(selected.low);
+    $("selected-symbol").textContent=selected.symbol+" · NSE · KITE QUOTE";
+    $("kite-status-badge").textContent="LIVE QUOTE RECEIVED";
+    setKiteMessage("Quote received for NSE:"+selected.symbol+". This refresh is a quote snapshot; the chart and technical signals still use sample candles until historical-data integration is completed.","success");
+  }catch(error){setKiteMessage(error.message+" Sample values have not been replaced.","warning")}
+}
 function persist(){try{localStorage.setItem("thirut_trader_watchlist",JSON.stringify(watchlist));localStorage.setItem("thirut_trader_journal",JSON.stringify(journal))}catch{}}
 function renderStocks(){const q=$("stock-search").value.trim().toLowerCase(),sector=$("sector-filter").value;const filtered=STOCKS.filter(s=>(sector==="All"||s.sector===sector)&&[s.name,s.symbol,s.sector].some(x=>x.toLowerCase().includes(q)));$("stock-rows").innerHTML=filtered.map(s=>`<tr data-symbol="${s.symbol}" class="${s.symbol===selected.symbol?"selected":""} tabindex="0"><td><span class="stock-name">${s.name}</span><span class="stock-symbol">${s.symbol} · NSE</span></td><td class="price-cell">${money(s.price)}</td><td><span class="change-pill ${s.change>=0?"positive":"negative"}">${s.change>=0?"▲":"▼"} ${pct(s.change)}</span></td><td><button class="star-button ${watchlist.includes(s.symbol)?"saved":""}" data-star="${s.symbol}" aria-label="Toggle ${s.symbol} watchlist">${watchlist.includes(s.symbol)?"★":"☆"}</button></td></tr>`).join("")||'<tr><td colspan="4">No matching stocks.</td></tr>';$("results-label").textContent=filtered.length+" sample stocks";$("watch-count").innerHTML=watchlist.length+' <small>stocks</small>'}
 function makeChart(s){const ctx=$("price-chart");if(!window.Chart){ctx.parentElement.innerHTML='<div class="empty-state">Chart library unavailable. Reload when online.</div>';return}let seed=s.symbol.split("").reduce((a,c)=>a+c.charCodeAt(0),0);let val=s.price*(1-s.change/100);const points=Array.from({length:32},(_,i)=>{seed=(seed*9301+49297)%233280;val+=(seed/233280-.47)*s.price*.003;return Number(val.toFixed(2))});points[points.length-1]=s.price;if(chart)chart.destroy();chart=new Chart(ctx,{type:"line",data:{labels:points.map((_,i)=>i%4===0?["09:30","10:30","11:30","12:30","13:30","14:30","15:20"][Math.min(6,Math.floor(i/5))]:""),datasets:[{data:points,borderColor:"#8ca5ff",backgroundColor:"rgba(124,151,255,.12)",fill:true,tension:.32,pointRadius:0,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:"#10182a",borderColor:"#34415c",borderWidth:1,displayColors:false,callbacks:{label:c=>money(c.raw)}}},scales:{x:{grid:{display:false},ticks:{color:"#7886a1",font:{size:9},maxRotation:0,autoSkip:false}},y:{position:"right",grid:{color:"rgba(116,135,171,.12)"},ticks:{color:"#7886a1",font:{size:9},maxTicksLimit:5,callback:v=>"₹"+Number(v).toLocaleString("en-IN")}}}}})}
@@ -138,4 +193,4 @@ $("add-watch").addEventListener("click",()=>toggleWatch(selected.symbol));
 $("journal-form").addEventListener("submit",e=>{e.preventDefault();const symbol=$("journal-symbol").value.trim().toUpperCase();const price=Number($("journal-price").value);if(!/^[A-Z0-9.&-]{1,20}$/.test(symbol)){ $("journal-symbol").setCustomValidity("Use a stock symbol with letters, numbers, dots, ampersands, or hyphens only."); $("journal-symbol").reportValidity(); return; } $("journal-symbol").setCustomValidity(""); if(!symbol||!Number.isFinite(price)||price<=0)return;journal.push({symbol,side:$("journal-side").value,price,date:new Date().toLocaleDateString("en-IN")});persist();renderJournal();e.target.reset()});
 document.querySelectorAll("[data-view]").forEach(b=>b.addEventListener("click",()=>{document.querySelectorAll("[data-view]").forEach(n=>n.classList.toggle("active",n===b));const target={overview:"market-section",watchlist:"watch-section",analysis:"analysis-section",journal:"journal-section"}[b.dataset.view];$(target).scrollIntoView({behavior:"smooth",block:"start"})}));
 $("today-label").textContent="INDIA · "+new Date().toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"}).toUpperCase();
-renderStocks();renderWatchlist();renderJournal();renderSignalHistory();$("run-analysis").addEventListener("click",runAnalysis);$("clear-signal-history").addEventListener("click",()=>{try{localStorage.removeItem("thirut_trader_signal_history")}catch{}renderSignalHistory()});selectStock(selected.symbol);
+renderStocks();renderWatchlist();renderJournal();renderSignalHistory();$("backend-url").value=backendBaseUrl();$("backend-url").addEventListener("change",()=>{const value=$("backend-url").value.trim().replace(/\/$/,"");try{localStorage.setItem("thirut_trader_backend_url",value)}catch{}$("backend-url").value=value});$("check-kite-status").addEventListener("click",checkKiteStatus);$("connect-kite").addEventListener("click",connectKite);$("refresh-live-quote").addEventListener("click",refreshSelectedQuote);$("run-analysis").addEventListener("click",runAnalysis);$("clear-signal-history").addEventListener("click",()=>{try{localStorage.removeItem("thirut_trader_signal_history")}catch{}renderSignalHistory()});selectStock(selected.symbol);
