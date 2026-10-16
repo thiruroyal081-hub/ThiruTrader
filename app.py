@@ -13,6 +13,8 @@ SECRET_KEY = os.environ.get("FLASK_SECRET_KEY")
 if not SECRET_KEY:
     raise RuntimeError("Set FLASK_SECRET_KEY in the backend environment before starting the server.")
 app.secret_key = SECRET_KEY
+# Cross-site browser sessions require HTTPS in production when frontend and API use different hosts.
+app.config.update(SESSION_COOKIE_SAMESITE="None", SESSION_COOKIE_SECURE=True, SESSION_COOKIE_HTTPONLY=True)
 CORS(app, origins=os.environ.get("FRONTEND_ORIGIN", "http://127.0.0.1:5500").split(","), supports_credentials=True)
 
 API_KEY = os.environ.get("KITE_API_KEY", "")
