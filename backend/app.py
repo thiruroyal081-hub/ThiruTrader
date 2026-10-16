@@ -152,7 +152,7 @@ def analyze():
         last = frame.iloc[-1]
         prev = frame.iloc[-2] if len(frame) > 1 else last
         checks = {
-            "trend_up": bool(last["ema20"] > last["ema50"]),
+            "trend_up": bool(last["close"] > last["ema20"] and last["ema20"] > last["ema50"]),
             "momentum_ok": bool(50 <= last["rsi14"] < 70),
             "macd_up": bool(last["macd"] > last["macd_signal"]),
             "volume_confirmed": bool(last["volume_confirm"] and last["close"] >= prev["close"]),
