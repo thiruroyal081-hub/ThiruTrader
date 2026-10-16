@@ -22,7 +22,79 @@ const pct=n=>(n>=0?"+":"")+n.toFixed(2)+"%";
 function persist(){try{localStorage.setItem("thirut_trader_watchlist",JSON.stringify(watchlist));localStorage.setItem("thirut_trader_journal",JSON.stringify(journal))}catch{}}
 function renderStocks(){const q=$("stock-search").value.trim().toLowerCase(),sector=$("sector-filter").value;const filtered=STOCKS.filter(s=>(sector==="All"||s.sector===sector)&&[s.name,s.symbol,s.sector].some(x=>x.toLowerCase().includes(q)));$("stock-rows").innerHTML=filtered.map(s=>`<tr data-symbol="${s.symbol}" class="${s.symbol===selected.symbol?"selected":""} tabindex="0"><td><span class="stock-name">${s.name}</span><span class="stock-symbol">${s.symbol} · NSE</span></td><td class="price-cell">${money(s.price)}</td><td><span class="change-pill ${s.change>=0?"positive":"negative"}">${s.change>=0?"▲":"▼"} ${pct(s.change)}</span></td><td><button class="star-button ${watchlist.includes(s.symbol)?"saved":""}" data-star="${s.symbol}" aria-label="Toggle ${s.symbol} watchlist">${watchlist.includes(s.symbol)?"★":"☆"}</button></td></tr>`).join("")||'<tr><td colspan="4">No matching stocks.</td></tr>';$("results-label").textContent=filtered.length+" sample stocks";$("watch-count").innerHTML=watchlist.length+' <small>stocks</small>'}
 function makeChart(s){const ctx=$("price-chart");if(!window.Chart){ctx.parentElement.innerHTML='<div class="empty-state">Chart library unavailable. Reload when online.</div>';return}let seed=s.symbol.split("").reduce((a,c)=>a+c.charCodeAt(0),0);let val=s.price*(1-s.change/100);const points=Array.from({length:32},(_,i)=>{seed=(seed*9301+49297)%233280;val+=(seed/233280-.47)*s.price*.003;return Number(val.toFixed(2))});points[points.length-1]=s.price;if(chart)chart.destroy();chart=new Chart(ctx,{type:"line",data:{labels:points.map((_,i)=>i%4===0?["09:30","10:30","11:30","12:30","13:30","14:30","15:20"][Math.min(6,Math.floor(i/5))]:""),datasets:[{data:points,borderColor:"#8ca5ff",backgroundColor:"rgba(124,151,255,.12)",fill:true,tension:.32,pointRadius:0,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:"#10182a",borderColor:"#34415c",borderWidth:1,displayColors:false,callbacks:{label:c=>money(c.raw)}}},scales:{x:{grid:{display:false},ticks:{color:"#7886a1",font:{size:9},maxRotation:0,autoSkip:false}},y:{position:"right",grid:{color:"rgba(116,135,171,.12)"},ticks:{color:"#7886a1",font:{size:9},maxTicksLimit:5,callback:v=>"₹"+Number(v).toLocaleString("en-IN")}}}}})}
-function selectStock(symbol){const s=STOCKS.find(x=>x.symbol===symbol);if(!s)return;selected=s;$("selected-name").textContent=s.name;$("selected-symbol").textContent=s.symbol+" · NSE";$("selected-price").textContent=money(s.price);$("selected-change").textContent=pct(s.change);$("selected-change").className=s.change>=0?"positive":"negative";$("selected-sector").textContent=s.sector;$("selected-high").textContent=money(s.high);$("selected-low").textContent=money(s.low);$("add-watch").textContent=watchlist.includes(s.symbol)?"★":"☆";$("add-watch").classList.toggle("saved",watchlist.includes(s.symbol));renderStocks();makeChart(s)}
+function selectStock(symbol){const s=STOCKS.find(x=>x.symbol===symbol);if(!s)return;selected=s;const analysisSymbol=$("analysis-symbol");if(analysisSymbol)analysisSymbol.textContent=s.symbol;$("selected-name").textContent=s.name;$("selected-symbol").textContent=s.symbol+" · NSE";$("selected-price").textContent=money(s.price);$("selected-change").textContent=pct(s.change);$("selected-change").className=s.change>=0?"positive":"negative";$("selected-sector").textContent=s.sector;$("selected-high").textContent=money(s.high);$("selected-low").textContent=money(s.low);$("add-watch").textContent=watchlist.includes(s.symbol)?"★":"☆";$("add-watch").classList.toggle("saved",watchlist.includes(s.symbol));renderStocks();makeChart(s)}
+function sampleHistory(stock){
+  // Deterministic illustrative history only; never presented as live data.
+  let seed=stock.symbol.split("").reduce((a,c)=>a+c.charCodeAt(0),17);
+  let close=stock.price*(1-stock.change/100),rows=[];
+  for(let i=0;i<90;i++){
+    seed=(seed*9301+49297)%233280;
+    const drift=(seed/233280-.505)*stock.price*.018 + (stock.change*.00012*stock.price);
+    close=Math.max(stock.price*.55,close+drift);
+    seed=(seed*9301+49297)%233280;
+    const volume=500000+Math.floor((seed/233280)*1800000);
+    rows.push({close,volume});
+  }
+  rows[rows.length-1].close=stock.price;
+  return rows;
+}
+function ema(values,period){
+  const k=2/(period+1);let value=values[0];const out=[value];
+  for(let i=1;i<values.length;i++){value=values[i]*k+value*(1-k);out.push(value)}
+  return out;
+}
+function rsi(values,period=14){
+  if(values.length<=period)return 50;
+  let gains=0,losses=0;
+  for(let i=values.length-period;i<values.length;i++){const d=values[i]-values[i-1];if(d>0)gains+=d;else losses-=d}
+  if(losses===0)return gains===0?50:100;
+  return 100-(100/(1+(gains/period)/(losses/period)));
+}
+function calculateSignal(stock){
+  const rows=sampleHistory(stock),closes=rows.map(x=>x.close),volumes=rows.map(x=>x.volume);
+  const e20=ema(closes,20).at(-1),e50=ema(closes,50).at(-1),e12=ema(closes,12),e26=ema(closes,26);
+  const macdLine=closes.map((_,i)=>e12[i]-e26[i]),signalLine=ema(macdLine,9);
+  const macd=macdLine.at(-1),macdSignal=signalLine.at(-1),r=rsi(closes);
+  const recentVolume=volumes.at(-1),avgVolume=volumes.slice(-21,-1).reduce((a,b)=>a+b,0)/20;
+  const trendUp=e20>e50,momentumUp=r>=50&&r<=70,macdUp=macd>macdSignal,volumeUp=recentVolume>avgVolume;
+  const trendDown=e20<e50,momentumDown=r<50,macdDown=macd<macdSignal;
+  const score=[trendUp,momentumUp,macdUp,volumeUp].filter(Boolean).length;
+  let signal="HOLD / NO TRADE",tone="neutral",summary="The sample rules do not show enough agreement to form a directional candidate.";
+  if(trendUp&&momentumUp&&macdUp&&score>=3){signal="BUY CANDIDATE";tone="buy";summary="Uptrend and positive momentum align under the sample rules; this is not a trade instruction."}
+  else if(trendDown&&momentumDown&&macdDown){signal="SELL / EXIT CANDIDATE";tone="sell";summary="Downtrend and negative momentum align under the sample rules; this is not a trade instruction."}
+  const reasons=[
+    (trendUp?"EMA trend is bullish (EMA 20 above EMA 50).":trendDown?"EMA trend is bearish (EMA 20 below EMA 50).":"EMA trend is mixed (EMA 20 and EMA 50 are close)."),
+    (r>=70?"RSI is at/above 70: momentum may be stretched.":r<=30?"RSI is at/below 30: downside may be stretched.":r>=50?"RSI is above 50, indicating positive momentum.":"RSI is below 50, indicating weaker momentum."),
+    (macdUp?"MACD is above its signal line.":"MACD is at/below its signal line."),
+    (volumeUp?"Latest illustrative volume is above its 20-period average.":"Latest illustrative volume does not exceed its 20-period average.")
+  ];
+  return {symbol:stock.symbol,signal,tone,summary,score,ema20:e20,ema50:e50,rsi:r,macd,macdSignal,volumeUp,reasons,time:new Date().toLocaleString("en-IN"),timeframe:$("analysis-timeframe").value};
+}
+function renderSignalHistory(){
+  const history=safeRead("thirut_trader_signal_history",[]);
+  $("signal-history").innerHTML=history.length?history.slice().reverse().map((x,i)=>`<div class="history-item"><div><strong>${x.symbol}</strong><span class="signal-chip signal-chip-${x.tone}">${x.signal}</span><small>${x.time} · ${x.timeframe}</small></div><span class="history-score">${x.score}/4</span></div>`).join(""):'<div class="empty-state">No saved analyses yet. Select a stock and run analysis.</div>';
+}
+function runAnalysis(){
+  const result=calculateSignal(selected);
+  $("analysis-symbol").textContent=result.symbol;
+  $("signal-banner").className="signal-banner signal-"+result.tone;
+  $("signal-label").textContent=result.signal;
+  $("signal-summary").textContent=result.summary;
+  $("signal-score").textContent=result.score+"/4";
+  $("indicator-trend").textContent=result.ema20>result.ema50?"Bullish":result.ema20<result.ema50?"Bearish":"Mixed";
+  $("indicator-ema").textContent="EMA20 "+money(result.ema20)+" · EMA50 "+money(result.ema50);
+  $("indicator-rsi").textContent=result.rsi.toFixed(1);
+  $("indicator-rsi-note").textContent=result.rsi>=70?"Potentially overbought":result.rsi<=30?"Potentially oversold":result.rsi>=50?"Positive momentum":"Weak momentum";
+  $("indicator-macd").textContent=result.macd>result.macdSignal?"Bullish crossover":"Bearish / below signal";
+  $("indicator-macd-note").textContent="MACD "+result.macd.toFixed(2)+" · Signal "+result.macdSignal.toFixed(2);
+  $("indicator-volume").textContent=result.volumeUp?"Above average":"Not confirmed";
+  $("indicator-volume-note").textContent="Illustrative volume vs 20-period average";
+  $("signal-reasons").innerHTML=result.reasons.map(x=>`<li>${x}</li>`).join("");
+  let history=safeRead("thirut_trader_signal_history",[]);
+  history.push({symbol:result.symbol,signal:result.signal,tone:result.tone,score:result.score,time:result.time,timeframe:result.timeframe});
+  try{localStorage.setItem("thirut_trader_signal_history",JSON.stringify(history.slice(-30)))}catch{}
+  renderSignalHistory();
+}
 function toggleWatch(symbol){watchlist=watchlist.includes(symbol)?watchlist.filter(x=>x!==symbol):[...watchlist,symbol];persist();renderStocks();renderWatchlist();$("add-watch").textContent=watchlist.includes(selected.symbol)?"★":"☆";$("add-watch").classList.toggle("saved",watchlist.includes(selected.symbol))}
 function renderWatchlist(){$("watchlist-items").innerHTML=watchlist.map(sym=>{const s=STOCKS.find(x=>x.symbol===sym);if(!s)return"";return `<div class="watch-item"><button data-select="${s.symbol}"><span class="stock-name">${s.name}</span><span class="stock-symbol">${s.symbol}</span></button><div class="watch-price">${money(s.price)}<small class="${s.change>=0?"positive":"negative"}">${pct(s.change)}</small></div></div>`}).join("")||'<div class="empty-state">No saved stocks. Use ☆ in the market table to add one.</div>';$("watch-count").innerHTML=watchlist.length+' <small>stocks</small>'}
 function renderJournal(){$("journal-entries").innerHTML=journal.length?journal.slice().reverse().map((j,i)=>`<div class="journal-entry"><div><strong>${j.symbol} · ${j.side}</strong><small>${money(j.price)} · ${j.date}</small></div><button data-delete-journal="${journal.length-1-i}">Remove</button></div>`).join(""):'<div class="empty-state">No practice entries yet. Add one above.</div>'}
@@ -31,6 +103,6 @@ document.addEventListener("keydown",e=>{if((e.key==="Enter"||e.key===" ")&&e.tar
 $("stock-search").addEventListener("input",renderStocks);$("sector-filter").addEventListener("change",renderStocks);
 $("add-watch").addEventListener("click",()=>toggleWatch(selected.symbol));
 $("journal-form").addEventListener("submit",e=>{e.preventDefault();const symbol=$("journal-symbol").value.trim().toUpperCase();const price=Number($("journal-price").value);if(!/^[A-Z0-9.&-]{1,20}$/.test(symbol)){ $("journal-symbol").setCustomValidity("Use a stock symbol with letters, numbers, dots, ampersands, or hyphens only."); $("journal-symbol").reportValidity(); return; } $("journal-symbol").setCustomValidity(""); if(!symbol||!Number.isFinite(price)||price<=0)return;journal.push({symbol,side:$("journal-side").value,price,date:new Date().toLocaleDateString("en-IN")});persist();renderJournal();e.target.reset()});
-document.querySelectorAll("[data-view]").forEach(b=>b.addEventListener("click",()=>{document.querySelectorAll("[data-view]").forEach(n=>n.classList.toggle("active",n===b));const target={overview:"market-section",watchlist:"watch-section",journal:"journal-section"}[b.dataset.view];$(target).scrollIntoView({behavior:"smooth",block:"start"})}));
+document.querySelectorAll("[data-view]").forEach(b=>b.addEventListener("click",()=>{document.querySelectorAll("[data-view]").forEach(n=>n.classList.toggle("active",n===b));const target={overview:"market-section",watchlist:"watch-section",analysis:"analysis-section",journal:"journal-section"}[b.dataset.view];$(target).scrollIntoView({behavior:"smooth",block:"start"})}));
 $("today-label").textContent="INDIA · "+new Date().toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"}).toUpperCase();
-renderStocks();renderWatchlist();renderJournal();selectStock(selected.symbol);
+renderStocks();renderWatchlist();renderJournal();renderSignalHistory();$("run-analysis").addEventListener("click",runAnalysis);$("clear-signal-history").addEventListener("click",()=>{try{localStorage.removeItem("thirut_trader_signal_history")}catch{}renderSignalHistory()});selectStock(selected.symbol);
