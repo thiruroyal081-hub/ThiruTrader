@@ -31,6 +31,17 @@
         <div class="date-chip" id="today-label">INDIA · TODAY</div>
       </section>
       <div class="notice"><span class="notice-icon">i</span><div><strong>Preview mode — illustrative prices only.</strong> These are hard-coded sample values, not live NSE/BSE quotes. No broker is connected and no real orders can be placed.</div></div>
+      <section class="panel connection-panel" id="data-connection">
+        <div class="panel-heading"><div><h2>Market data connection</h2><p>Use Kite inside ThiruTrader — credentials stay on the backend</p></div><span class="mini-tag" id="kite-status-badge">NOT CONNECTED</span></div>
+        <div class="connection-controls">
+          <label class="backend-url-field">Backend URL<input id="backend-url" type="url" placeholder="https://your-backend.example.com" autocomplete="url"></label>
+          <button class="secondary-button" id="check-kite-status" type="button">Check connection</button>
+          <button class="primary-button" id="connect-kite" type="button">Connect Kite</button>
+          <button class="secondary-button" id="refresh-live-quote" type="button">Refresh selected quote</button>
+        </div>
+        <p class="connection-message" id="kite-connection-message" role="status">Not configured. Add your separately hosted Flask backend URL to check Kite status.</p>
+        <p class="connection-footnote">Never enter your Kite API key, API secret or access token here. This field accepts only your backend URL. Live data works only after your backend is deployed, Kite credentials are configured there, and your account has the required data access.</p>
+      </section>
       <section class="stats-grid">
         <article class="stat-card"><div class="stat-label">NIFTY 50 <span class="mini-tag">SAMPLE</span></div><div class="stat-value" id="nifty-value">24,812.40</div><div class="stat-change positive">▲ 0.62% <span>+152.80</span></div><div class="sparkline green">╱╲╱╱╲╱╱╱</div></article>
         <article class="stat-card"><div class="stat-label">SENSEX <span class="mini-tag">SAMPLE</span></div><div class="stat-value">81,455.20</div><div class="stat-change positive">▲ 0.48% <span>+389.10</span></div><div class="sparkline blue">╲╱╱╲╱╱╱╲</div></article>
