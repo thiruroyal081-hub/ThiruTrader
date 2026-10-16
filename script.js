@@ -34,64 +34,93 @@ function setKiteMessage(message,tone="neutral"){
 }
 async function checkKiteStatus(){
   const base=backendBaseUrl();
-  if(!base){setKiteMessage("Enter your separately hosted Flask backend URL first.");$("kite-status-badge").textContent="NOT CONFIGURED";return null}
+  if(!base){setKiteMessage("Enter your deployed backend URL. The browser cannot run the Python strategy engine by itself.");$("kite-status-badge").textContent="NOT CONFIGURED";return null}
   if(!validBackendUrl(base)){setKiteMessage("Use an HTTPS backend URL. HTTP is allowed only for localhost development.","warning");$("kite-status-badge").textContent="INVALID URL";return null}
-  setKiteMessage("Checking backend…");
+  setKiteMessage("Checking strategy API…");
   try{
-    const response=await fetch(base+"/api/health",{credentials:"include"});
+    const response=await fetch(base+"/api/health");
     const data=await response.json();
-    if(!response.ok)throw new Error(data.message||"Backend health check failed.");
-    const configured=Boolean(data.kite_configured),authenticated=Boolean(data.authenticated);
-    $("kite-status-badge").textContent=authenticated?"KITE CONNECTED":configured?"READY TO CONNECT":"API NOT CONFIGURED";
-    setKiteMessage(authenticated?"Kite session is connected. You can request quotes if your account and API plan permit it.":configured?"Backend is reachable. Connect Kite to authorize this session.":"Backend is reachable, but Kite API credentials are not configured on the server.",authenticated?"success":configured?"neutral":"warning");
+    if(!response.ok||!data.ok)throw new Error(data.error||"API health check failed");
+    $("kite-status-badge").textContent="API ONLINE";
+    setKiteMessage("Backend is online. Source: "+(data.data_source||"configured provider")+". "+(data.data_type||"Historical data only")+". Broker orders are disabled.","success");
+    $("market-data-label").textContent="MARKET DATA: HISTORICAL API";
     return data;
   }catch(error){
-    $("kite-status-badge").textContent="BACKEND OFFLINE";
-    setKiteMessage("Could not reach backend. Check its URL, HTTPS, CORS and deployment settings. "+error.message,"warning");
+    $("kite-status-badge").textContent="API OFFLINE";
+    setKiteMessage("Could not reach backend. Check URL, deployment and CORS. "+error.message,"warning");
     return null;
   }
 }
 async function connectKite(){
-  const base=backendBaseUrl();
-  if(!base){setKiteMessage("Enter and save your backend URL, then check the connection.","warning");return}
-  const status=await checkKiteStatus();
-  if(!status)return;
-  if(!status.kite_configured){setKiteMessage("Kite API credentials are not configured on your backend yet. Do not enter secrets on this website.","warning");return}
-  window.location.href=base+"/auth/login";
+  await checkKiteStatus();
+  await loadSelectedHistory();
 }
 async function refreshSelectedQuote(){
+  await loadSelectedHistory();
+}
+function renderHistoryChart(candles){
+  const ctx=$("price-chart");
+  if(!window.Chart){$("chart-data-note")&&($("chart-data-note").textContent="Chart library unavailable.");return}
+  if(chart){chart.destroy();chart=null}
+  chart=new Chart(ctx,{type:"line",data:{labels:candles.map((x,i)=>i%Math.max(1,Math.floor(candles.length/7))===0?new Date(x.time*1000).toLocaleDateString("en-IN",{day:"2-digit",month:"short"}):""),datasets:[{data:candles.map(x=>x.close),borderColor:"#8ca5ff",backgroundColor:"rgba(124,151,255,.12)",fill:true,tension:.15,pointRadius:0,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:"#10182a",borderColor:"#34415c",borderWidth:1,displayColors:false,callbacks:{label:c=>money(c.raw)}}},scales:{x:{grid:{display:false},ticks:{color:"#7886a1",font:{size:9},maxRotation:0,autoSkip:true}},y:{position:"right",grid:{color:"rgba(116,135,171,.12)"},ticks:{color:"#7886a1",font:{size:9},maxTicksLimit:5,callback:v=>"₹"+Number(v).toLocaleString("en-IN")}}}}});
+}
+async function loadSelectedHistory(){
   const base=backendBaseUrl();
-  if(!base){setKiteMessage("Configure your backend URL first.","warning");return}
-  if(!validBackendUrl(base)){setKiteMessage("Use an HTTPS backend URL. HTTP is allowed only for localhost development.","warning");return}
-  setKiteMessage("Requesting a quote for "+selected.symbol+"…");
+  if(!base||!validBackendUrl(base)){setKiteMessage("Backend not configured. Deploy backend/ and enter its HTTPS URL first.","warning");return}
+  setKiteMessage("Loading historical candles for "+selected.symbol+"…");
   try{
-    const response=await fetch(base+"/api/quote?i="+encodeURIComponent("NSE:"+selected.symbol),{credentials:"include"});
+    const response=await fetch(base+"/api/history?symbol="+encodeURIComponent(selected.symbol)+"&period=1y&interval=1d");
     const data=await response.json();
-    if(!response.ok)throw new Error(data.message||data.error||"Quote request failed. Connect Kite first.");
-    const quote=data["NSE:"+selected.symbol];
-    if(!quote||!Number.isFinite(Number(quote.last_price)))throw new Error("No quote returned for this symbol. Check the NSE symbol and Kite access.");
-    selected.price=Number(quote.last_price);
-    const previousClose=Number(quote.ohlc?.close);
-    if(Number.isFinite(previousClose)&&previousClose>0)selected.change=((selected.price-previousClose)/previousClose)*100;
-    else if(Number.isFinite(Number(quote.net_change)))selected.change=Number(quote.net_change)/Math.max(.01,selected.price-Number(quote.net_change))*100;
-    if(quote.ohlc){if(Number.isFinite(Number(quote.ohlc.high)))selected.high=Number(quote.ohlc.high);if(Number.isFinite(Number(quote.ohlc.low)))selected.low=Number(quote.ohlc.low)}
-    $("selected-price").textContent=money(selected.price);$("selected-change").textContent=pct(selected.change);
+    if(!response.ok)throw new Error(data.error||"History request failed");
+    if(!Array.isArray(data.candles)||data.candles.length<2)throw new Error("Provider returned too few candles");
+    const candles=data.candles;
+    selected.price=Number(candles[candles.length-1].close);
+    const prev=Number(candles[candles.length-2].close);
+    selected.change=prev>0?(selected.price-prev)/prev*100:0;
+    selected.high=Math.max(...candles.slice(-20).map(x=>Number(x.high)));
+    selected.low=Math.min(...candles.slice(-20).map(x=>Number(x.low)));
+    selected.providerData=true;
+    $("selected-price").textContent=money(selected.price);
+    $("selected-change").textContent=pct(selected.change);
     $("selected-change").className=selected.change>=0?"positive":"negative";
-    $("selected-high").textContent=money(selected.high);$("selected-low").textContent=money(selected.low);
-    $("selected-symbol").textContent=selected.symbol+" · NSE · KITE QUOTE SNAPSHOT";
-    $("market-data-label").textContent="SELECTED QUOTE: KITE SNAPSHOT";
-    $("market-data-notice").innerHTML='<span class="notice-icon">i</span><div><strong>One quote snapshot received.</strong> Only the selected stock quote was refreshed. Other stock rows, index cards, chart candles and technical-analysis candles remain sample data.</div>';
-    $("table-data-note").textContent="Selected quote snapshot; other rows sample";
-    resetAnalysisPanel();
-    renderStocks();renderWatchlist();
-    $("kite-status-badge").textContent="LIVE QUOTE RECEIVED";
-    setKiteMessage("Quote snapshot received for NSE:"+selected.symbol+(quote.timestamp?" · last traded "+quote.timestamp:"")+". It does not stream or auto-refresh. Chart and technical signals still use sample candles.","success");
-  }catch(error){setKiteMessage(error.message+" Sample values have not been replaced.","warning")}
+    $("selected-high").textContent=money(selected.high);
+    $("selected-low").textContent=money(selected.low);
+    $("selected-symbol").textContent=selected.symbol+" · "+data.interval+" · "+data.source;
+    $("market-data-label").textContent="MARKET DATA: HISTORICAL PROVIDER";
+    $("market-data-notice").innerHTML='<span class="notice-icon">i</span><div><strong>Historical provider data loaded.</strong> This is not guaranteed real-time data. Verify quote timestamps and exchange coverage independently. No broker orders are enabled.</div>';
+    $("table-data-note").textContent="Provider history loaded for selected symbol";
+    renderHistoryChart(candles);
+    renderStocks();
+    setKiteMessage("Loaded "+candles.length+" historical candles for "+selected.symbol+". Latest candle: "+candles[candles.length-1].date+". This is not a live streaming quote.","success");
+  }catch(error){
+    selected.providerData=false;
+    $("selected-price").textContent="—";
+    $("selected-change").textContent="No verified quote";
+    $("selected-high").textContent="—";$("selected-low").textContent="—";
+    if(chart){chart.destroy();chart=null}
+    setKiteMessage(error.message+" No sample data was substituted.","warning");
+    renderStocks();
+  }
 }
 function persist(){try{localStorage.setItem("thirut_trader_watchlist",JSON.stringify(watchlist));localStorage.setItem("thirut_trader_journal",JSON.stringify(journal))}catch{}}
-function renderStocks(){const q=$("stock-search").value.trim().toLowerCase(),sector=$("sector-filter").value;const filtered=STOCKS.filter(s=>(sector==="All"||s.sector===sector)&&[s.name,s.symbol,s.sector].some(x=>x.toLowerCase().includes(q)));$("stock-rows").innerHTML=filtered.map(s=>`<tr data-symbol="${s.symbol}" class="${s.symbol===selected.symbol?"selected":""} tabindex="0"><td><span class="stock-name">${s.name}</span><span class="stock-symbol">${s.symbol} · NSE</span></td><td class="price-cell">${money(s.price)}</td><td><span class="change-pill ${s.change>=0?"positive":"negative"}">${s.change>=0?"▲":"▼"} ${pct(s.change)}</span></td><td><button class="star-button ${watchlist.includes(s.symbol)?"saved":""}" data-star="${s.symbol}" aria-label="Toggle ${s.symbol} watchlist">${watchlist.includes(s.symbol)?"★":"☆"}</button></td></tr>`).join("")||'<tr><td colspan="4">No matching stocks.</td></tr>';$("results-label").textContent=filtered.length+" sample stocks";$("watch-count").innerHTML=watchlist.length+' <small>stocks</small>'}
+function renderStocks(){const q=$("stock-search").value.trim().toLowerCase(),sector=$("sector-filter").value;const filtered=STOCKS.filter(s=>(sector==="All"||s.sector===sector)&&[s.name,s.symbol,s.sector].some(x=>x.toLowerCase().includes(q)));$("stock-rows").innerHTML=filtered.map(s=>`<tr data-symbol="${s.symbol}" class="${s.symbol===selected.symbol?"selected":""} tabindex="0"><td><span class="stock-name">${s.name}</span><span class="stock-symbol">${s.symbol} · NSE</span></td><td class="price-cell">${s.providerData?money(s.price):"—"}</td><td><span class="change-pill ${s.providerData?(s.change>=0?"positive":"negative"):""}">${s.providerData?pct(s.change):"API needed"}</span></td><td><button class="star-button ${watchlist.includes(s.symbol)?"saved":""}" data-star="${s.symbol}" aria-label="Toggle ${s.symbol} watchlist">${watchlist.includes(s.symbol)?"★":"☆"}</button></td></tr>`).join("")||'<tr><td colspan="4">No matching stocks.</td></tr>';$("results-label").textContent=filtered.length+" sample stocks";$("watch-count").innerHTML=watchlist.length+' <small>stocks</small>'}
 function makeChart(s){const ctx=$("price-chart");if(!window.Chart){ctx.parentElement.innerHTML='<div class="empty-state">Chart library unavailable. Reload when online.</div>';return}let seed=s.symbol.split("").reduce((a,c)=>a+c.charCodeAt(0),0);let val=s.price*(1-s.change/100);const points=Array.from({length:32},(_,i)=>{seed=(seed*9301+49297)%233280;val+=(seed/233280-.47)*s.price*.003;return Number(val.toFixed(2))});points[points.length-1]=s.price;if(chart)chart.destroy();chart=new Chart(ctx,{type:"line",data:{labels:points.map((_,i)=>i%4===0?["09:30","10:30","11:30","12:30","13:30","14:30","15:20"][Math.min(6,Math.floor(i/5))]:""),datasets:[{data:points,borderColor:"#8ca5ff",backgroundColor:"rgba(124,151,255,.12)",fill:true,tension:.32,pointRadius:0,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:"#10182a",borderColor:"#34415c",borderWidth:1,displayColors:false,callbacks:{label:c=>money(c.raw)}}},scales:{x:{grid:{display:false},ticks:{color:"#7886a1",font:{size:9},maxRotation:0,autoSkip:false}},y:{position:"right",grid:{color:"rgba(116,135,171,.12)"},ticks:{color:"#7886a1",font:{size:9},maxTicksLimit:5,callback:v=>"₹"+Number(v).toLocaleString("en-IN")}}}}})}
-function selectStock(symbol){const s=STOCKS.find(x=>x.symbol===symbol);if(!s)return;selected=s;const analysisSymbol=$("analysis-symbol");if(analysisSymbol)analysisSymbol.textContent=s.symbol;resetAnalysisPanel();$("selected-name").textContent=s.name;$("selected-symbol").textContent=s.symbol+" · NSE";$("selected-price").textContent=money(s.price);$("selected-change").textContent=pct(s.change);$("selected-change").className=s.change>=0?"positive":"negative";$("selected-sector").textContent=s.sector;$("selected-high").textContent=money(s.high);$("selected-low").textContent=money(s.low);$("add-watch").textContent=watchlist.includes(s.symbol)?"★":"☆";$("add-watch").classList.toggle("saved",watchlist.includes(s.symbol));renderStocks();makeChart(s)}
+function selectStock(symbol){
+  const s=STOCKS.find(x=>x.symbol===symbol);if(!s)return;
+  selected=s;
+  $("analysis-symbol").textContent=s.symbol;
+  $("selected-name").textContent=s.name;
+  $("selected-symbol").textContent=s.symbol+" · NSE";
+  $("selected-price").textContent=s.providerData?money(s.price):"—";
+  $("selected-change").textContent=s.providerData?pct(s.change):"Connect API for historical data";
+  $("selected-change").className=s.providerData?(s.change>=0?"positive":"negative"):"";
+  $("selected-sector").textContent=s.sector;
+  $("selected-high").textContent=s.providerData?money(s.high):"—";
+  $("selected-low").textContent=s.providerData?money(s.low):"—";
+  $("add-watch").textContent=watchlist.includes(s.symbol)?"★":"☆";
+  $("add-watch").classList.toggle("saved",watchlist.includes(s.symbol));
+  resetAnalysisPanel();renderStocks();loadSelectedHistory();
+}
 function sampleHistory(stock){
   // Deterministic synthetic close/volume series for UI testing only. Not historical market data.
   let seed=stock.symbol.split("").reduce((a,c)=>a+c.charCodeAt(0),17);
@@ -171,44 +200,59 @@ function renderSignalHistory(){
   const history=safeRead("thirut_trader_signal_history",[]);
   $("signal-history").innerHTML=history.length?history.slice().reverse().map((x,i)=>`<div class="history-item"><div><strong>${x.symbol}</strong><span class="signal-chip signal-chip-${x.tone}">${x.signal}</span><small>${x.time} · ${x.timeframe}</small></div><span class="history-score">${x.score}/4</span></div>`).join(""):'<div class="empty-state">No saved analyses yet. Select a stock and run analysis.</div>';
 }
-function runAnalysis(){
-  const result=calculateSignal(selected);
-  $("analysis-symbol").textContent=result.symbol;
-  $("signal-banner").className="signal-banner signal-"+result.tone;
-  $("signal-label").textContent=result.signal;
-  $("signal-summary").textContent=result.summary;
-  $("signal-score").textContent=result.score+"/4";$("signal-score-label").textContent=result.scoreDirection+" votes · not probability";
-  $("indicator-trend").textContent=result.ema20>result.ema50?"Bullish":result.ema20<result.ema50?"Bearish":"Mixed";
-  $("indicator-ema").textContent="EMA20 "+money(result.ema20)+" · EMA50 "+money(result.ema50);
-  $("indicator-rsi").textContent=result.rsi.toFixed(1);
-  $("indicator-rsi-note").textContent=result.rsi>=70?"Potentially overbought":result.rsi<=30?"Potentially oversold":result.rsi>=50?"Positive momentum":"Weak momentum";
-  $("indicator-macd").textContent=result.macdCrossUp?"Bullish crossover":result.macdCrossDown?"Bearish crossover":result.macd>result.macdSignal?"Above signal line":"Below signal line";
-  $("indicator-macd-note").textContent="MACD "+result.macd.toFixed(2)+" · Signal "+result.macdSignal.toFixed(2);
-  $("indicator-volume").textContent=result.volumeBullish?"Bullish confirmation":result.volumeBearish?"Bearish confirmation":result.volumeUp?"Above average only":"Not confirmed";
-  $("indicator-volume-note").textContent="Synthetic volume + candle direction";
-  $("signal-reasons").innerHTML=result.reasons.map(x=>`<li>${x}</li>`).join("");
-  let history=safeRead("thirut_trader_signal_history",[]);
-  if(!Array.isArray(history))history=[];
-  history.push({symbol:result.symbol,signal:result.signal,tone:result.tone,score:result.score,time:result.time,timeframe:result.timeframe,scoreDirection:result.scoreDirection});
-  try{localStorage.setItem("thirut_trader_signal_history",JSON.stringify(history.slice(-30)))}catch{}
-  renderSignalHistory();
+async function runAnalysis(){
+  const base=backendBaseUrl();
+  if(!base||!validBackendUrl(base)){setKiteMessage("Deploy the backend and configure its HTTPS URL before analyzing real historical data.","warning");return}
+  $("run-analysis").disabled=true;$("run-analysis").textContent="Analyzing…";
+  try{
+    const response=await fetch(base+"/api/analyze?symbol="+encodeURIComponent(selected.symbol)+"&period=1y&interval=1d");
+    const result=await response.json();
+    if(!response.ok)throw new Error(result.error||"Analysis failed");
+    const tone=result.signal==="BUY CANDIDATE"?"buy":result.signal==="EXIT / AVOID CANDIDATE"?"sell":"neutral";
+    $("signal-banner").className="signal-banner signal-"+tone;
+    $("signal-label").textContent=result.signal;
+    $("signal-summary").textContent="Historical candle date: "+result.candle_date+". "+result.disclaimer;
+    $("signal-score").textContent=result.score+"/"+result.score_out_of;
+    $("signal-score-label").textContent="rules passed · not probability";
+    $("indicator-trend").textContent=result.checks.trend_up?"Bullish":"Not bullish";
+    $("indicator-ema").textContent="EMA20 "+money(result.ema20)+" · EMA50 "+money(result.ema50);
+    $("indicator-rsi").textContent=Number(result.rsi14).toFixed(1);
+    $("indicator-rsi-note").textContent=result.rsi14>=70?"Potentially overbought":result.rsi14<=30?"Potentially oversold":result.rsi14>=50?"Positive momentum":"Weak momentum";
+    $("indicator-macd").textContent=result.macd>result.macd_signal?"Above signal line":"Below signal line";
+    $("indicator-macd-note").textContent="MACD "+Number(result.macd).toFixed(2)+" · Signal "+Number(result.macd_signal).toFixed(2);
+    $("indicator-volume").textContent=result.checks.volume_confirmed?"Confirmed":"Not confirmed";
+    $("indicator-volume-note").textContent="Provider volume vs 20-candle average";
+    $("signal-reasons").innerHTML=[
+      "Trend rule (close > EMA20 > EMA50): "+(result.checks.trend_up?"passed":"not passed"),
+      "RSI(14) 50–70: "+(result.checks.momentum_ok?"passed":"not passed"),
+      "MACD above signal: "+(result.checks.macd_up?"passed":"not passed"),
+      "Volume above average with non-down candle: "+(result.checks.volume_confirmed?"passed":"not passed"),
+      "Source: "+result.source+"; data is historical, not guaranteed real-time."
+    ].map(x=>"<li>"+x+"</li>").join("");
+    let history=safeRead("thirut_trader_signal_history",[]);if(!Array.isArray(history))history=[];
+    history.push({symbol:result.symbol,signal:result.signal,tone,score:result.score,time:new Date().toLocaleString("en-IN"),timeframe:"Historical daily",scoreDirection:"rule checks"});
+    try{localStorage.setItem("thirut_trader_signal_history",JSON.stringify(history.slice(-30)))}catch{}
+    renderSignalHistory();
+    setKiteMessage("Analysis completed on provider historical candles for "+result.symbol+". No order was placed.","success");
+  }catch(error){setKiteMessage(error.message+" No sample signal was substituted.","warning")}
+  finally{$("run-analysis").disabled=false;$("run-analysis").textContent="Analyze selected stock"}
 }
 function resetAnalysisPanel(){
   if(!$("signal-label"))return;
   $("signal-banner").className="signal-banner signal-neutral";
   $("signal-label").textContent="HOLD / NO TRADE";
-  $("signal-summary").textContent="Stock changed. Run analysis to calculate indicators for the selected symbol.";
+  $("signal-summary").textContent="Select Analyze selected stock to request indicators from the historical-data backend."
   $("signal-score").textContent="—";
   $("signal-score-label").textContent="votes · not probability";
   ["indicator-trend","indicator-rsi","indicator-macd","indicator-volume"].forEach(id=>$(id).textContent="—");
   $("indicator-ema").textContent="Run analysis to calculate";
   $("indicator-rsi-note").textContent="Momentum";
   $("indicator-macd-note").textContent="Momentum confirmation";
-  $("indicator-volume-note").textContent="Sample volume vs 20-period average";
-  $("signal-reasons").innerHTML="<li>Select Analyze selected stock to calculate a new result.</li>";
+  $("indicator-volume-note").textContent="Provider volume vs 20-period average";
+  $("signal-reasons").innerHTML="<li>Configure the backend before running a historical analysis.</li>";
 }
 function toggleWatch(symbol){watchlist=watchlist.includes(symbol)?watchlist.filter(x=>x!==symbol):[...watchlist,symbol];persist();renderStocks();renderWatchlist();$("add-watch").textContent=watchlist.includes(selected.symbol)?"★":"☆";$("add-watch").classList.toggle("saved",watchlist.includes(selected.symbol))}
-function renderWatchlist(){$("watchlist-items").innerHTML=watchlist.map(sym=>{const s=STOCKS.find(x=>x.symbol===sym);if(!s)return"";return `<div class="watch-item"><button data-select="${s.symbol}"><span class="stock-name">${s.name}</span><span class="stock-symbol">${s.symbol}</span></button><div class="watch-price">${money(s.price)}<small class="${s.change>=0?"positive":"negative"}">${pct(s.change)}</small></div></div>`}).join("")||'<div class="empty-state">No saved stocks. Use ☆ in the market table to add one.</div>';$("watch-count").innerHTML=watchlist.length+' <small>stocks</small>'}
+function renderWatchlist(){$("watchlist-items").innerHTML=watchlist.map(sym=>{const s=STOCKS.find(x=>x.symbol===sym);if(!s)return"";return `<div class="watch-item"><button data-select="${s.symbol}"><span class="stock-name">${s.name}</span><span class="stock-symbol">${s.symbol}</span></button><div class="watch-price">${s.providerData?money(s.price):"—"}<small class="${s.providerData?(s.change>=0?"positive":"negative"):""}">${s.providerData?pct(s.change):"API needed"}</small></div></div>`}).join("")||'<div class="empty-state">No saved stocks. Use ☆ in the market table to add one.</div>';$("watch-count").innerHTML=watchlist.length+' <small>stocks</small>'}
 function renderJournal(){$("journal-entries").innerHTML=journal.length?journal.slice().reverse().map((j,i)=>`<div class="journal-entry"><div><strong>${j.symbol} · ${j.side}</strong><small>${money(j.price)} · ${j.date}</small></div><button data-delete-journal="${journal.length-1-i}">Remove</button></div>`).join(""):'<div class="empty-state">No practice entries yet. Add one above.</div>'}
 document.addEventListener("click",e=>{const star=e.target.closest("[data-star]");if(star){e.stopPropagation();toggleWatch(star.dataset.star);return}const row=e.target.closest("tr[data-symbol]");if(row){selectStock(row.dataset.symbol);return}const pick=e.target.closest("[data-select]");if(pick){selectStock(pick.dataset.select);return}const del=e.target.closest("[data-delete-journal]");if(del){journal.splice(Number(del.dataset.deleteJournal),1);persist();renderJournal()}});
 document.addEventListener("keydown",e=>{if((e.key==="Enter"||e.key===" ")&&e.target.matches("tr[data-symbol]")){e.preventDefault();selectStock(e.target.dataset.symbol)}});
@@ -218,3 +262,29 @@ $("journal-form").addEventListener("submit",e=>{e.preventDefault();const symbol=
 document.querySelectorAll("[data-view]").forEach(b=>b.addEventListener("click",()=>{document.querySelectorAll("[data-view]").forEach(n=>n.classList.toggle("active",n===b));const target={overview:"market-section",watchlist:"watch-section",analysis:"analysis-section",journal:"journal-section"}[b.dataset.view];$(target).scrollIntoView({behavior:"smooth",block:"start"})}));
 $("today-label").textContent="INDIA · "+new Date().toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"}).toUpperCase();
 renderStocks();renderWatchlist();renderJournal();renderSignalHistory();$("backend-url").value=backendBaseUrl();$("backend-url").addEventListener("change",()=>{const value=$("backend-url").value.trim().replace(/\/$/,"");$("backend-url").value=value;if(value&&!validBackendUrl(value)){setKiteMessage("Use an HTTPS backend URL. HTTP is allowed only for localhost development.","warning");return}try{localStorage.setItem("thirut_trader_backend_url",JSON.stringify(value))}catch{}});$("check-kite-status").addEventListener("click",checkKiteStatus);$("connect-kite").addEventListener("click",connectKite);$("refresh-live-quote").addEventListener("click",refreshSelectedQuote);$("run-analysis").addEventListener("click",runAnalysis);$("clear-signal-history").addEventListener("click",()=>{try{localStorage.removeItem("thirut_trader_signal_history")}catch{}renderSignalHistory()});selectStock(selected.symbol);if(backendBaseUrl())checkKiteStatus();
+$("backtest-form").addEventListener("submit",async e=>{
+  e.preventDefault();
+  const base=backendBaseUrl();
+  if(!base||!validBackendUrl(base)){$("backtest-status").textContent="Configure a valid HTTPS backend URL above first.";return}
+  const symbol=$("backtest-symbol").value.trim().toUpperCase();
+  const payload={symbol,period:$("backtest-period").value,interval:"1d",capital:Number($("backtest-capital").value),risk_pct:Number($("backtest-risk").value),cost_bps_per_side:Number($("backtest-cost").value)};
+  if(!payload.symbol||!(payload.capital>0)||!(payload.risk_pct>0&&payload.risk_pct<=5)||!(payload.cost_bps_per_side>=0&&payload.cost_bps_per_side<=200)){$("backtest-status").textContent="Check symbol, capital, risk and estimated costs.";return}
+  $("run-backtest").disabled=true;$("run-backtest").textContent="Testing…";$("backtest-status").textContent="Fetching historical candles and running backtest…";
+  try{
+    const response=await fetch(base+"/api/backtest",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+    const data=await response.json();if(!response.ok)throw new Error(data.error||"Backtest failed");
+    const metrics=[
+      ["Initial capital",money(data.initial_capital)],
+      ["Final equity",money(data.final_equity_marked_to_market)],
+      ["Net P/L",money(data.net_pnl)],
+      ["Return",Number(data.return_pct).toFixed(2)+"%"],
+      ["Trades",String(data.closed_and_open_trades)],
+      ["Win rate",data.win_rate_pct===null?"—":Number(data.win_rate_pct).toFixed(1)+"%"],
+      ["Max drawdown",Number(data.max_drawdown_pct).toFixed(2)+"%"],
+      ["Costs / side",data.cost_bps_per_side+" bps"]
+    ];
+    $("backtest-results").innerHTML='<div class="backtest-metrics">'+metrics.map(([label,value])=>'<div class="backtest-metric"><small>'+label+'</small><strong>'+value+'</strong></div>').join("")+'</div><div class="backtest-trades"><strong>Recent trades</strong>'+(data.trades.length?data.trades.slice(-10).reverse().map(t=>'<div class="backtest-trade"><span>'+t.entry_date+' → '+t.exit_date+'</span><span>'+t.quantity+' shares</span><strong class="'+(t.pnl>=0?"positive":"negative")+'">'+money(t.pnl)+'</strong></div>').join(""):'<p class="muted">No trades were triggered by this rule set in the selected period.</p>')+'</div><ul class="backtest-limits">'+data.limitations.map(x=>'<li>'+x+'</li>').join("")+'</ul>';
+    $("backtest-status").textContent="Backtest completed using "+data.source+" historical "+data.interval+" candles. Results are historical, not a forecast.";
+  }catch(error){$("backtest-status").textContent=error.message+" No sample result was substituted.";$("backtest-results").innerHTML='<div class="empty-state">Backtest unavailable. Check the backend and try again.</div>'}
+  finally{$("run-backtest").disabled=false;$("run-backtest").textContent="Run backtest"}
+});
