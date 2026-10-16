@@ -56,9 +56,9 @@
       </section>
       <section class="analysis-grid" id="analysis-section">
         <article class="panel analysis-panel">
-          <div class="panel-heading"><div><h2>Technical analysis & signals</h2><p>Rule-based indicators calculated from illustrative sample history</p></div><span class="mini-tag">SAMPLE ONLY</span></div>
-          <div class="analysis-toolbar"><div class="analysis-selected"><span class="stock-symbol">SELECTED STOCK</span><strong id="analysis-symbol">RELIANCE</strong></div><label>Analysis timeframe<select id="analysis-timeframe"><option value="Daily">Daily</option><option value="Swing">Swing (daily data)</option></select></label><button class="primary-button" id="run-analysis" type="button">Analyze selected stock</button></div>
-          <div class="signal-banner signal-neutral" id="signal-banner"><div><span class="signal-kicker">RULE-BASED RESULT</span><strong id="signal-label">HOLD / NO TRADE</strong><p id="signal-summary">Run an analysis to calculate sample indicators.</p></div><div class="signal-score"><strong id="signal-score">—</strong><span>rule score</span></div></div>
+          <div class="panel-heading"><div><h2>Technical analysis & signals</h2><p>Technical indicators · synthetic sample data only</p></div><span class="mini-tag">SAMPLE ONLY</span></div>
+          <div class="analysis-toolbar"><div class="analysis-selected"><span class="stock-symbol">SELECTED STOCK</span><strong id="analysis-symbol">RELIANCE</strong></div><div class="analysis-timeframe"><span class="stock-symbol">TIMEFRAME</span><strong>Daily sample</strong></div><button class="primary-button" id="run-analysis" type="button">Analyze selected stock</button></div>
+          <div class="signal-banner signal-neutral" id="signal-banner"><div><span class="signal-kicker">RULE-BASED RESULT</span><strong id="signal-label">HOLD / NO TRADE</strong><p id="signal-summary">Run analysis to calculate indicators from synthetic sample candles.</p></div><div class="signal-score"><strong id="signal-score">—</strong><span id="signal-score-label">votes · not probability</span></div></div>
           <div class="indicator-grid">
             <div class="indicator-card"><span>EMA 20 / EMA 50</span><strong id="indicator-trend">—</strong><small id="indicator-ema">Waiting for analysis</small></div>
             <div class="indicator-card"><span>RSI (14)</span><strong id="indicator-rsi">—</strong><small id="indicator-rsi-note">Momentum</small></div>
@@ -66,7 +66,7 @@
             <div class="indicator-card"><span>Volume</span><strong id="indicator-volume">—</strong><small id="indicator-volume-note">Compared with recent average</small></div>
           </div>
           <div class="signal-reasons"><strong>Why this result?</strong><ul id="signal-reasons"><li>No analysis run yet.</li></ul></div>
-          <div class="signal-disclaimer">Educational prototype. Sample history is generated for testing, not real market data. Signals are not recommendations and can be wrong. No live quotes or orders are connected.</div>
+          <div class="signal-disclaimer">Educational prototype. Sample candles are generated for testing and are not real market data. Signals are not recommendations and can be wrong. No live quotes or orders are connected.</div>
         </article>
         <article class="panel signal-history-panel">
           <div class="panel-heading"><div><h2>Signal history</h2><p>Saved in this browser when you run analysis</p></div><button class="text-button" id="clear-signal-history" type="button">Clear</button></div>
