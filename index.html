@@ -30,7 +30,7 @@
         <div><div class="eyebrow">YOUR MARKET, AT A GLANCE</div><h1>Market overview<span>.</span></h1><p>Track Indian equities in one focused workspace.</p></div>
         <div class="date-chip" id="today-label">INDIA · TODAY</div>
       </section>
-      <div class="notice"><span class="notice-icon">i</span><div><strong>Preview mode — illustrative prices only.</strong> These are hard-coded sample values, not live NSE/BSE quotes. No broker is connected and no real orders can be placed.</div></div>
+      <div class="notice" id="market-data-notice"><span class="notice-icon">i</span><div><strong>Preview mode — illustrative prices only.</strong> These are sample values, not live NSE/BSE quotes. No broker is connected and no real orders can be placed.</div></div>
       <section class="panel connection-panel" id="data-connection">
         <div class="panel-heading"><div><h2>Market data connection</h2><p>Use Kite inside ThiruTrader — credentials stay on the backend</p></div><span class="mini-tag" id="kite-status-badge">NOT CONNECTED</span></div>
         <div class="connection-controls">
@@ -53,7 +53,7 @@
           <div class="panel-heading"><div><h2>Equity market</h2><p>Browse sample-listed stocks</p></div><span class="mini-tag">DEMO DATA</span></div>
           <div class="toolbar"><label class="search-box"><span>⌕</span><input id="stock-search" type="search" placeholder="Search company or symbol..." aria-label="Search stocks"></label><select id="sector-filter" aria-label="Filter by sector"><option value="All">All sectors</option><option>Banking</option><option>IT</option><option>Energy</option><option>Auto</option><option>FMCG</option><option>Telecom</option></select></div>
           <div class="table-wrap"><table><thead><tr><th>COMPANY / SYMBOL</th><th>PRICE (₹)</th><th>CHANGE</th><th></th></tr></thead><tbody id="stock-rows"></tbody></table></div>
-          <div class="table-foot"><span id="results-label">12 sample stocks</span><span>Values are illustrative</span></div>
+          <div class="table-foot"><span id="results-label">12 sample stocks</span><span id="table-data-note">Values are illustrative</span></div>
         </article>
         <article class="panel chart-panel">
           <div class="panel-heading"><div><h2 id="selected-name">Reliance Industries</h2><p id="selected-symbol">RELIANCE · NSE</p></div><button class="icon-button" id="add-watch" aria-label="Add selected stock to watchlist" title="Add to watchlist">☆</button></div>
