@@ -90,7 +90,7 @@ async function loadSelectedHistory(){
     $("market-data-notice").innerHTML='<span class="notice-icon">i</span><div><strong>Historical provider data loaded.</strong> This is not guaranteed real-time data. Verify quote timestamps and exchange coverage independently. No broker orders are enabled.</div>';
     $("table-data-note").textContent="Provider history loaded for selected symbol";
     renderHistoryChart(candles);
-    renderStocks();
+    renderStocks();renderWatchlist();
     setKiteMessage("Loaded "+candles.length+" historical candles for "+selected.symbol+". Latest candle: "+candles[candles.length-1].date+". This is not a live streaming quote.","success");
   }catch(error){
     selected.providerData=false;
