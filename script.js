@@ -104,7 +104,6 @@ async function loadSelectedHistory(){
 }
 function persist(){try{localStorage.setItem("thirut_trader_watchlist",JSON.stringify(watchlist));localStorage.setItem("thirut_trader_journal",JSON.stringify(journal))}catch{}}
 function renderStocks(){const q=$("stock-search").value.trim().toLowerCase(),sector=$("sector-filter").value;const filtered=STOCKS.filter(s=>(sector==="All"||s.sector===sector)&&[s.name,s.symbol,s.sector].some(x=>x.toLowerCase().includes(q)));$("stock-rows").innerHTML=filtered.map(s=>`<tr data-symbol="${s.symbol}" class="${s.symbol===selected.symbol?"selected":""} tabindex="0"><td><span class="stock-name">${s.name}</span><span class="stock-symbol">${s.symbol} · NSE</span></td><td class="price-cell">${s.providerData?money(s.price):"—"}</td><td><span class="change-pill ${s.providerData?(s.change>=0?"positive":"negative"):""}">${s.providerData?pct(s.change):"API needed"}</span></td><td><button class="star-button ${watchlist.includes(s.symbol)?"saved":""}" data-star="${s.symbol}" aria-label="Toggle ${s.symbol} watchlist">${watchlist.includes(s.symbol)?"★":"☆"}</button></td></tr>`).join("")||'<tr><td colspan="4">No matching stocks.</td></tr>';$("results-label").textContent=filtered.length+" sample stocks";$("watch-count").innerHTML=watchlist.length+' <small>stocks</small>'}
-function makeChart(s){const ctx=$("price-chart");if(!window.Chart){ctx.parentElement.innerHTML='<div class="empty-state">Chart library unavailable. Reload when online.</div>';return}let seed=s.symbol.split("").reduce((a,c)=>a+c.charCodeAt(0),0);let val=s.price*(1-s.change/100);const points=Array.from({length:32},(_,i)=>{seed=(seed*9301+49297)%233280;val+=(seed/233280-.47)*s.price*.003;return Number(val.toFixed(2))});points[points.length-1]=s.price;if(chart)chart.destroy();chart=new Chart(ctx,{type:"line",data:{labels:points.map((_,i)=>i%4===0?["09:30","10:30","11:30","12:30","13:30","14:30","15:20"][Math.min(6,Math.floor(i/5))]:""),datasets:[{data:points,borderColor:"#8ca5ff",backgroundColor:"rgba(124,151,255,.12)",fill:true,tension:.32,pointRadius:0,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:"#10182a",borderColor:"#34415c",borderWidth:1,displayColors:false,callbacks:{label:c=>money(c.raw)}}},scales:{x:{grid:{display:false},ticks:{color:"#7886a1",font:{size:9},maxRotation:0,autoSkip:false}},y:{position:"right",grid:{color:"rgba(116,135,171,.12)"},ticks:{color:"#7886a1",font:{size:9},maxTicksLimit:5,callback:v=>"₹"+Number(v).toLocaleString("en-IN")}}}}})}
 function selectStock(symbol){
   const s=STOCKS.find(x=>x.symbol===symbol);if(!s)return;
   selected=s;
@@ -120,85 +119,6 @@ function selectStock(symbol){
   $("add-watch").textContent=watchlist.includes(s.symbol)?"★":"☆";
   $("add-watch").classList.toggle("saved",watchlist.includes(s.symbol));
   resetAnalysisPanel();renderStocks();loadSelectedHistory();
-}
-function sampleHistory(stock){
-  // Deterministic synthetic close/volume series for UI testing only. Not historical market data.
-  let seed=stock.symbol.split("").reduce((a,c)=>a+c.charCodeAt(0),17);
-  let close=stock.price*(1-stock.change/100),rows=[];
-  for(let i=0;i<120;i++){
-    seed=(seed*9301+49297)%233280;
-    const noise=(seed/233280-.5)*stock.price*.014;
-    const drift=stock.change*.00008*stock.price;
-    close=Math.max(stock.price*.55,close+noise+drift);
-    seed=(seed*9301+49297)%233280;
-    const volume=500000+Math.floor((seed/233280)*1800000);
-    const range=stock.price*(.002+(seed/233280)*.008);
-    rows.push({open:close-noise*.35,high:close+range,low:Math.max(.01,close-range),close,volume});
-  }
-  // Keep the final synthetic OHLC candle internally consistent after anchoring its close.
-  const last=rows[rows.length-1];
-  last.close=stock.price;
-  last.high=Math.max(last.high,last.open,last.close);
-  last.low=Math.max(.01,Math.min(last.low,last.open,last.close));
-  return rows;
-}
-function ema(values,period){
-  if(!values.length)return [];
-  const k=2/(period+1),out=Array(values.length).fill(null);
-  if(values.length<period){let value=values[0];out[0]=value;for(let i=1;i<values.length;i++){value=values[i]*k+value*(1-k);out[i]=value}return out}
-  let value=values.slice(0,period).reduce((a,b)=>a+b,0)/period;
-  out[period-1]=value;
-  for(let i=period;i<values.length;i++){value=values[i]*k+value*(1-k);out[i]=value}
-  return out;
-}
-function rsi(values,period=14){
-  if(values.length<=period)return 50;
-  let gains=0,losses=0;
-  for(let i=1;i<=period;i++){const d=values[i]-values[i-1];if(d>0)gains+=d;else losses-=d}
-  let avgGain=gains/period,avgLoss=losses/period;
-  for(let i=period+1;i<values.length;i++){
-    const d=values[i]-values[i-1],gain=Math.max(0,d),loss=Math.max(0,-d);
-    avgGain=((avgGain*(period-1))+gain)/period;
-    avgLoss=((avgLoss*(period-1))+loss)/period;
-  }
-  if(avgLoss===0)return avgGain===0?50:100;
-  if(avgGain===0)return 0;
-  return 100-(100/(1+avgGain/avgLoss));
-}
-function calculateSignal(stock){
-  const rows=sampleHistory(stock),closes=rows.map(x=>x.close),volumes=rows.map(x=>x.volume);
-  const e20=ema(closes,20).at(-1),e50=ema(closes,50).at(-1);
-  const e12=ema(closes,12),e26=ema(closes,26);
-  const macdLine=closes.map((_,i)=>e12[i]===null||e26[i]===null?null:e12[i]-e26[i]);
-  const validMacd=macdLine.filter(x=>x!==null),signalLine=ema(validMacd,9);
-  const macd=validMacd.at(-1),macdSignal=signalLine.at(-1),macdPrevious=validMacd.at(-2),signalPrevious=signalLine.at(-2);
-  const r=rsi(closes),recentVolume=volumes.at(-1),avgVolume=volumes.slice(-21,-1).reduce((a,b)=>a+b,0)/20;
-  const volumeUp=recentVolume>avgVolume,trendUp=e20>e50,trendDown=e20<e50;
-  const lastClose=closes.at(-1),priorClose=closes.at(-2);
-  const priceUp=lastClose>priorClose,priceDown=lastClose<priorClose;
-  const momentumUp=r>=50&&r<70,momentumDown=r<50;
-  const macdUp=macd>macdSignal,macdDown=macd<macdSignal;
-  // High volume is directional only when paired with the candle's direction.
-  const volumeBullish=volumeUp&&priceUp,volumeBearish=volumeUp&&priceDown;
-  const bullishVotes=[trendUp,momentumUp,macdUp,volumeBullish].filter(Boolean).length;
-  const bearishVotes=[trendDown,momentumDown,macdDown,volumeBearish].filter(Boolean).length;
-  let signal="HOLD / NO TRADE",tone="neutral",summary="The indicators are mixed. Wait for clearer confirmation rather than forcing a direction.";
-  let score=Math.max(bullishVotes,bearishVotes),scoreDirection=bullishVotes>bearishVotes?"bullish":bearishVotes>bullishVotes?"bearish":"mixed";
-  if(bullishVotes>=3&&trendUp&&momentumUp&&macdUp){signal="BUY CANDIDATE";tone="buy";score=bullishVotes;scoreDirection="bullish";summary="Trend, momentum and MACD align upward in this synthetic sample. This is a demo result, not a trade instruction."}
-  else if(bearishVotes>=3&&trendDown&&momentumDown&&macdDown){signal="SELL / EXIT CANDIDATE";tone="sell";score=bearishVotes;scoreDirection="bearish";summary="Trend, momentum and MACD align downward in this synthetic sample. This is a demo result, not a trade instruction."}
-  const reasons=[
-    (trendUp?"EMA trend is bullish (EMA 20 above EMA 50).":trendDown?"EMA trend is bearish (EMA 20 below EMA 50).":"EMA trend is mixed."),
-    (r>=70?"RSI is 70 or higher: momentum may be stretched.":r<=30?"RSI is 30 or lower: downside may be stretched.":r>=50?"RSI is above 50, supporting positive momentum.":"RSI is below 50, indicating weaker momentum."),
-    (macdUp?"MACD is above its signal line.":macdDown?"MACD is below its signal line.":"MACD and signal line are equal."),
-    (volumeBullish?"Sample volume is above average on an up candle.":volumeBearish?"Sample volume is above average on a down candle.":volumeUp?"Sample volume is above average, but candle direction is not a clear confirmation.":"Sample volume is not above its 20-period average."),
-    "Signal score counts directional rule checks; it is not a probability or a measured win rate.",
-    "This run uses generated sample candles, not actual NSE/BSE history."
-  ];
-  return {symbol:stock.symbol,signal,tone,summary,score,scoreDirection,bullishVotes,bearishVotes,ema20:e20,ema50:e50,rsi:r,macd,macdSignal,macdCrossUp:macdPrevious<=signalPrevious&&macd>macdSignal,macdCrossDown:macdPrevious>=signalPrevious&&macd<macdSignal,volumeUp,volumeBullish,volumeBearish,reasons,time:new Date().toLocaleString("en-IN"),timeframe:"Daily (sample)"};
-}
-function renderSignalHistory(){
-  const history=safeRead("thirut_trader_signal_history",[]);
-  $("signal-history").innerHTML=history.length?history.slice().reverse().map((x,i)=>`<div class="history-item"><div><strong>${x.symbol}</strong><span class="signal-chip signal-chip-${x.tone}">${x.signal}</span><small>${x.time} · ${x.timeframe}</small></div><span class="history-score">${x.score}/4</span></div>`).join(""):'<div class="empty-state">No saved analyses yet. Select a stock and run analysis.</div>';
 }
 async function runAnalysis(){
   const base=backendBaseUrl();
