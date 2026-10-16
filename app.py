@@ -9,13 +9,14 @@ from kiteconnect import KiteConnect
 
 load_dotenv()
 app = Flask(__name__)
-app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-only-change-me")
+SECRET_KEY = os.environ.get("FLASK_SECRET_KEY")
+if not SECRET_KEY:
+    raise RuntimeError("Set FLASK_SECRET_KEY in the backend environment before starting the server.")
+app.secret_key = SECRET_KEY
 CORS(app, origins=os.environ.get("FRONTEND_ORIGIN", "http://127.0.0.1:5500").split(","), supports_credentials=True)
 
 API_KEY = os.environ.get("KITE_API_KEY", "")
 API_SECRET = os.environ.get("KITE_API_SECRET", "")
-REDIRECT_URL = os.environ.get("KITE_REDIRECT_URL", "http://127.0.0.1:5000/auth/callback")
-
 
 def kite_client():
     if not API_KEY:
@@ -59,6 +60,8 @@ def auth_login():
 @app.get("/auth/callback")
 def auth_callback():
     request_token = request.args.get("request_token")
+    if not session.pop("kite_oauth_started", False):
+        return jsonify({"error": "login_not_started", "message": "Start login from /auth/login first."}), 400
     if request.args.get("status") != "success" or not request_token:
         return jsonify({"error": "login_not_completed", "message": "Kite login did not return a successful request_token."}), 400
     if not API_SECRET:
