@@ -24,23 +24,23 @@
     <main class="main">
       <header class="topbar">
         <div class="mobile-brand">T<span>+</span> ThiruTrader</div>
-        <div class="market-status"><span class="status-dot"></span> <span id="market-data-label">MARKET DATA: SAMPLE</span> <span class="pill">NSE · BSE</span></div>
+        <div class="market-status"><span class="status-dot"></span> <span id="market-data-label">MARKET DATA: HISTORICAL API</span> <span class="pill">NSE · BSE</span></div>
       </header>
       <section class="welcome">
         <div><div class="eyebrow">YOUR MARKET, AT A GLANCE</div><h1>Market overview<span>.</span></h1><p>Track Indian equities in one focused workspace.</p></div>
         <div class="date-chip" id="today-label">INDIA · TODAY</div>
       </section>
-      <div class="notice" id="market-data-notice"><span class="notice-icon">i</span><div><strong>Preview mode — illustrative prices only.</strong> These are sample values, not live NSE/BSE quotes. No broker is connected and no real orders can be placed.</div></div>
+      <div class="notice" id="market-data-notice"><span class="notice-icon">i</span><div><strong>Historical-data mode.</strong> Stock table values and charts are illustrative until a backend history request succeeds. No broker is connected and no real orders can be placed.</div></div>
       <section class="panel connection-panel" id="data-connection">
-        <div class="panel-heading"><div><h2>Market data connection</h2><p>Use Kite inside ThiruTrader — credentials stay on the backend</p></div><span class="mini-tag" id="kite-status-badge">NOT CONNECTED</span></div>
+        <div class="panel-heading"><div><h2>Market data connection</h2><p>Connect the historical-data and strategy API — no broker secrets needed</p></div><span class="mini-tag" id="kite-status-badge">NOT CONNECTED</span></div>
         <div class="connection-controls">
           <label class="backend-url-field">Backend URL<input id="backend-url" type="url" placeholder="https://your-backend.example.com" autocomplete="url"></label>
           <button class="secondary-button" id="check-kite-status" type="button">Check connection</button>
-          <button class="primary-button" id="connect-kite" type="button">Connect Kite</button>
-          <button class="secondary-button" id="refresh-live-quote" type="button">Refresh selected quote</button>
+          <button class="primary-button" id="connect-kite" type="button">Load selected history</button>
+          <button class="secondary-button" id="refresh-live-quote" type="button">Run historical analysis</button>
         </div>
         <p class="connection-message" id="kite-connection-message" role="status">Not configured. Add your separately hosted Flask backend URL to check Kite status.</p>
-        <p class="connection-footnote">Never enter your Kite API key, API secret or access token here. This field accepts only your backend URL. Live data works only after your backend is deployed, Kite credentials are configured there, and your account has the required data access.</p>
+        <p class="connection-footnote">This field accepts only your HTTPS backend URL. The learning API uses historical market data and does not place broker orders. It does not guarantee real-time quotes.</p>
       </section>
       <section class="stats-grid">
         <article class="stat-card"><div class="stat-label">NIFTY 50 <span class="mini-tag">SAMPLE</span></div><div class="stat-value" id="nifty-value">24,812.40</div><div class="stat-change positive">▲ 0.62% <span>+152.80</span></div><div class="sparkline green">╱╲╱╱╲╱╱╱</div></article>
@@ -50,7 +50,7 @@
       </section>
       <section class="content-grid">
         <article class="panel market-panel" id="market-section">
-          <div class="panel-heading"><div><h2>Equity market</h2><p>Browse sample-listed stocks</p></div><span class="mini-tag">DEMO DATA</span></div>
+          <div class="panel-heading"><div><h2>Equity market</h2><p>Browse equity symbols</p></div><span class="mini-tag">HISTORY API</span></div>
           <div class="toolbar"><label class="search-box"><span>⌕</span><input id="stock-search" type="search" placeholder="Search company or symbol..." aria-label="Search stocks"></label><select id="sector-filter" aria-label="Filter by sector"><option value="All">All sectors</option><option>Banking</option><option>IT</option><option>Energy</option><option>Auto</option><option>FMCG</option><option>Telecom</option></select></div>
           <div class="table-wrap"><table><thead><tr><th>COMPANY / SYMBOL</th><th>PRICE (₹)</th><th>CHANGE</th><th></th></tr></thead><tbody id="stock-rows"></tbody></table></div>
           <div class="table-foot"><span id="results-label">12 sample stocks</span><span id="table-data-note">Values are illustrative</span></div>
@@ -58,18 +58,18 @@
         <article class="panel chart-panel">
           <div class="panel-heading"><div><h2 id="selected-name">Reliance Industries</h2><p id="selected-symbol">RELIANCE · NSE</p></div><button class="icon-button" id="add-watch" aria-label="Add selected stock to watchlist" title="Add to watchlist">☆</button></div>
           <div class="chart-price"><strong id="selected-price">₹1,462.50</strong><span id="selected-change" class="positive">+1.24%</span></div>
-          <div class="chart-meta"><span>ILLUSTRATIVE CHART</span><span>1D · SAMPLE</span></div>
+          <div class="chart-meta"><span>HISTORICAL WHEN CONNECTED</span><span>DAILY CANDLES</span></div>
           <div class="chart-wrap"><canvas id="price-chart" aria-label="Illustrative stock price chart"></canvas></div>
-          <div class="chart-legend"><span><i class="legend-line"></i> Sample price movement</span><span>Not for trading decisions</span></div>
+          <div class="chart-legend"><span><i class="legend-line"></i> Historical close prices</span><span>Not for trading decisions</span></div>
           <div class="detail-divider"></div>
           <div class="quick-stats"><div><span>Sector</span><strong id="selected-sector">Energy</strong></div><div><span>Session high</span><strong id="selected-high">₹1,478.00</strong></div><div><span>Session low</span><strong id="selected-low">₹1,439.20</strong></div></div>
         </article>
       </section>
       <section class="analysis-grid" id="analysis-section">
         <article class="panel analysis-panel">
-          <div class="panel-heading"><div><h2>Technical analysis & signals</h2><p>Technical indicators · synthetic sample data only</p></div><span class="mini-tag">SAMPLE ONLY</span></div>
+          <div class="panel-heading"><div><h2>Technical analysis & signals</h2><p>Technical indicators calculated from historical provider candles when API is configured</p></div><span class="mini-tag">HISTORICAL API</span></div>
           <div class="analysis-toolbar"><div class="analysis-selected"><span class="stock-symbol">SELECTED STOCK</span><strong id="analysis-symbol">RELIANCE</strong></div><div class="analysis-timeframe"><span class="stock-symbol">TIMEFRAME</span><strong>Daily sample</strong></div><button class="primary-button" id="run-analysis" type="button">Analyze selected stock</button></div>
-          <div class="signal-banner signal-neutral" id="signal-banner"><div><span class="signal-kicker">RULE-BASED RESULT</span><strong id="signal-label">HOLD / NO TRADE</strong><p id="signal-summary">Run analysis to calculate indicators from synthetic sample candles.</p></div><div class="signal-score"><strong id="signal-score">—</strong><span id="signal-score-label">votes · not probability</span></div></div>
+          <div class="signal-banner signal-neutral" id="signal-banner"><div><span class="signal-kicker">RULE-BASED RESULT</span><strong id="signal-label">HOLD / NO TRADE</strong><p id="signal-summary">Connect the backend and run analysis on provider historical candles.</p></div><div class="signal-score"><strong id="signal-score">—</strong><span id="signal-score-label">votes · not probability</span></div></div>
           <div class="indicator-grid">
             <div class="indicator-card"><span>EMA 20 / EMA 50</span><strong id="indicator-trend">—</strong><small id="indicator-ema">Waiting for analysis</small></div>
             <div class="indicator-card"><span>RSI (14)</span><strong id="indicator-rsi">—</strong><small id="indicator-rsi-note">Momentum</small></div>
@@ -77,21 +77,36 @@
             <div class="indicator-card"><span>Volume</span><strong id="indicator-volume">—</strong><small id="indicator-volume-note">Compared with recent average</small></div>
           </div>
           <div class="signal-reasons"><strong>Why this result?</strong><ul id="signal-reasons"><li>No analysis run yet.</li></ul></div>
-          <div class="signal-disclaimer">Educational prototype. Sample candles are generated for testing and are not real market data. Signals are not recommendations and can be wrong. No live quotes or orders are connected.</div>
+          <div class="signal-disclaimer">Educational strategy result from historical provider data when connected. Data may be delayed or unavailable. No live intraday stream or broker order execution is enabled.</div>
         </article>
         <article class="panel signal-history-panel">
           <div class="panel-heading"><div><h2>Signal history</h2><p>Saved in this browser when you run analysis</p></div><button class="text-button" id="clear-signal-history" type="button">Clear</button></div>
           <div id="signal-history" class="signal-history"><div class="empty-state">No saved analyses yet.</div></div>
         </article>
       </section>
+
+      <section class="panel backtest-panel" id="backtest-section">
+        <div class="panel-heading"><div><h2>Historical strategy backtest</h2><p>Run the same rule set over historical daily candles, with a simplified transaction-cost estimate.</p></div><span class="mini-tag">HISTORICAL TEST</span></div>
+        <form id="backtest-form" class="backtest-form">
+          <label>Equity symbol<input id="backtest-symbol" value="RELIANCE" maxlength="20" required></label>
+          <label>History period<select id="backtest-period"><option value="1y">1 year</option><option value="2y" selected>2 years</option><option value="5y">5 years</option></select></label>
+          <label>Initial capital (₹)<input id="backtest-capital" type="number" min="1000" step="1000" value="100000" required></label>
+          <label>Risk per trade (%)<input id="backtest-risk" type="number" min="0.1" max="5" step="0.1" value="1" required></label>
+          <label>Estimated cost per side (bps)<input id="backtest-cost" type="number" min="0" max="200" step="1" value="10" required></label>
+          <button class="primary-button" type="submit" id="run-backtest">Run backtest</button>
+        </form>
+        <div id="backtest-status" class="connection-message" role="status">Configure the backend URL above to run a historical backtest.</div>
+        <div id="backtest-results" class="backtest-results"><div class="empty-state">No backtest has been run yet.</div></div>
+        <p class="signal-disclaimer">Past results are not predictive. This is a simplified daily-candle backtest, not a live trading bot. It does not include all taxes, charges, slippage, circuit limits or order execution constraints.</p>
+      </section>
       <section class="bottom-grid">
         <article class="panel watch-panel" id="watch-section"><div class="panel-heading"><div><h2>My watchlist</h2><p>Your saved symbols on this device</p></div><span class="mini-tag">LOCAL</span></div><div id="watchlist-items" class="watchlist-items"></div></article>
-        <article class="panel journal-panel" id="journal-section"><div class="panel-heading"><div><h2>Paper trade journal</h2><p>Record practice ideas — no real orders</p></div><span class="mini-tag">PAPER</span></div>
+        <article class="panel journal-panel" id="journal-section"><div class="panel-heading"><div><h2>Learning trade journal</h2><p>Record practice ideas — no real orders</p></div><span class="mini-tag">PAPER</span></div>
           <form id="journal-form" class="journal-form"><label>Stock symbol<input id="journal-symbol" maxlength="20" placeholder="e.g. RELIANCE" required></label><label>Side<select id="journal-side"><option>Buy</option><option>Sell</option></select></label><label>Entry price (₹)<input id="journal-price" type="number" min="0.01" step="0.01" placeholder="100.00" required></label><button class="primary-button" type="submit">Add practice entry</button></form>
           <div id="journal-entries" class="journal-entries"><div class="empty-state">No practice entries yet. Add one above.</div></div>
         </article>
       </section>
-      <footer><span>ThiruTrader · Independent learning project</span><span>Sample data only · Not investment advice</span></footer>
+      <footer><span>ThiruTrader · Independent learning project</span><span>Historical data depends on provider · No broker orders · Not investment advice</span></footer>
     </main>
   </div>
 </body>
