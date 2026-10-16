@@ -1,24 +1,63 @@
 # ThiruTrader
 
-A responsive Indian equities dashboard prototype.
+A responsive NSE/BSE equities dashboard prototype with a prepared Python Flask backend for future Kite Connect integration.
 
-## Current features
-- NSE/BSE-themed stock list with search, sector filter, and selection
-- Illustrative price chart
+## Frontend features
+- Stock search and sector filters
+- Illustrative stock charts and example index values
 - Browser-local watchlist
-- Paper-trade journal
-- Mobile-friendly dark UI
+- Practice trade journal saved in the current browser
+- Responsive dark dashboard
 
 ## Important limitations
-- **All displayed prices and index values are illustrative sample data, not live quotes.**
-- No Zerodha account is connected. No real orders are submitted.
-- The chart is generated from sample values and is not a live or historical market chart.
-- The watchlist and journal are stored in this browser only using localStorage.
+- **All displayed prices, index values, and chart points are sample data, not live quotes.**
+- The current frontend does not call the Flask backend.
+- No broker account is connected and no real orders are placed.
+- Watchlist and journal data stay in the current browser's local storage.
+- This is an educational prototype, not investment advice.
 
-## Run
-Open `index.html` in a modern browser. An internet connection is needed to load Chart.js from its CDN.
+## Open the static website
+The frontend files are `index.html`, `styles.css`, and `script.js`. You can open `index.html` directly, or run a local static server:
+```bash
+python3 -m http.server 8000
+```
+Then visit `http://127.0.0.1:8000`. Chart.js is loaded from a CDN, so chart rendering requires internet access.
 
-## Future Kite Connect integration
-Use a server-side backend (for example, Python Flask) for Kite Connect authentication and API calls. Keep the API secret and access tokens on the server and out of frontend JavaScript, public commits, and browser storage. Live market data and historical candle access require the appropriate Kite Connect access/plan. Test with sample/paper data until authorized access is configured.
+## Backend setup (local development only)
+The backend scaffold is in `app.py`; dependencies are in `requirements.txt`.
 
-This project is an educational prototype, not investment advice.
+1. Install Python 3.11 or newer.
+2. Create and activate a virtual environment:
+   ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate
+   pip install -r requirements.txt
+   ```
+3. Copy `.env.example` to `.env` and set a long, random `FLASK_SECRET_KEY`. Do not commit `.env`.
+4. Keep `KITE_API_KEY` and `KITE_API_SECRET` blank until valid API credentials are available. Store real values only in the backend environment—not in frontend JavaScript, GitHub files, or screenshots.
+5. Set the redirect URL in your Kite developer app to match `KITE_REDIRECT_URL`.
+6. Start the local API:
+   ```bash
+   python app.py
+   ```
+7. Check `http://127.0.0.1:5000/api/health`. A healthy response only confirms the local server is running; it does not confirm live market access.
+
+## Backend endpoints scaffolded
+- `GET /api/health` — backend status
+- `GET /auth/login` and `GET /auth/callback` — Kite login/session exchange
+- `POST /auth/logout`
+- `GET /api/profile`
+- `GET /api/quote?i=NSE:INFY&i=NSE:RELIANCE`
+- `GET /api/historical/<instrument_token>/<interval>?from=YYYY-MM-DD%20HH:MM:SS&to=YYYY-MM-DD%20HH:MM:SS`
+
+These endpoints are scaffolding and have not been end-to-end tested with a configured broker account.
+
+## Before public/live deployment
+- GitHub Pages serves static files only; it cannot run this Python server. Deploy the backend separately to a server/host that supports Python.
+- Configure HTTPS, a strong secret key, secure session cookies, and exact allowed frontend origins in the hosting environment.
+- Test authentication and API errors before connecting the frontend to the backend.
+- Keep real order placement disabled until authentication, risk controls, and comprehensive testing are completed.
+- Live quotes and historical candles require appropriate Kite Connect access/plan. Until that is configured and tested, use clearly labelled sample data only.
+
+Kite Connect documentation: https://kite.trade/docs/connect/v3/
+GitHub Pages publishing guide: https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site
