@@ -14,7 +14,7 @@ A responsive NSE/BSE equities dashboard prototype with a prepared Python Flask b
 ## Important limitations
 - **All displayed prices, index values, chart points, and analysis history are sample/illustrative data, not live quotes or validated trading signals.**
 - The signal engine is an educational rules demo. Its generated sample history must not be used for real trading decisions.
-- The frontend now has an in-site backend URL, connection-status check, Kite login button, and manual selected-stock quote request.
+- The frontend now has an in-site backend URL, connection-status check, Kite login button, and manual selected-stock quote request. It accepts HTTPS backend URLs only (except localhost development), clearly labels a quote snapshot, and does not pretend the rest of the dashboard is live.
 - The technical-analysis engine still uses generated sample candles; live historical-candle integration is a separate next step.
 - No broker account is connected and no real orders are placed.
 - Watchlist and journal data stay in the current browser's local storage.
@@ -39,7 +39,7 @@ The backend scaffold is in `app.py`; dependencies are in `requirements.txt`.
    ```
 3. Copy `.env.example` to `.env` and set a long, random `FLASK_SECRET_KEY`. Do not commit `.env`.
 4. Keep `KITE_API_KEY` and `KITE_API_SECRET` blank until valid API credentials are available. Store real values only in the backend environment—not in frontend JavaScript, GitHub files, or screenshots.
-5. For production cross-origin browser login, use HTTPS and set `FRONTEND_ORIGIN` to the exact GitHub Pages origin (for example `https://thiruroyal081-hub.github.io`). Configure the session-cookie settings and test login/logout carefully.
+5. For production cross-origin browser login, use HTTPS and set `FRONTEND_ORIGIN` to the exact GitHub Pages origin `https://thiruroyal081-hub.github.io` (origin only, no `/ThiruTrader/` path). Set `SESSION_COOKIE_SECURE=true` in production. For local HTTP development only, `.env.example` uses `SESSION_COOKIE_SECURE=false`. Test login/logout carefully.
 6. Set the redirect URL in your Kite developer app to match `KITE_REDIRECT_URL`.
 7. Start the local API:
    ```bash
@@ -55,7 +55,7 @@ The backend scaffold is in `app.py`; dependencies are in `requirements.txt`.
 - `GET /api/quote?i=NSE:INFY&i=NSE:RELIANCE`
 - `GET /api/historical/<instrument_token>/<interval>?from=YYYY-MM-DD%20HH:MM:SS&to=YYYY-MM-DD%20HH:MM:SS`
 
-These endpoints are scaffolding and have not been end-to-end tested with a configured broker account.
+These endpoints are scaffolding and have not been end-to-end tested with a configured broker account. The dashboard quote button requests one manual quote snapshot; it is not streaming, automatic refresh, or a live historical chart.
 
 ## Before public/live deployment
 - GitHub Pages serves static files only; it cannot run this Python server. Deploy the backend separately to a server/host that supports Python.
