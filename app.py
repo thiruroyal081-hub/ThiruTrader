@@ -3,7 +3,7 @@ from datetime import date
 from functools import wraps
 
 from dotenv import load_dotenv
-from flask import Flask, jsonify, redirect, request, session, url_for
+from flask import Flask, jsonify, redirect, request, session
 from flask_cors import CORS
 from kiteconnect import KiteConnect
 
@@ -14,8 +14,18 @@ if not SECRET_KEY:
     raise RuntimeError("Set FLASK_SECRET_KEY in the backend environment before starting the server.")
 app.secret_key = SECRET_KEY
 # Cross-site browser sessions require HTTPS in production when frontend and API use different hosts.
-app.config.update(SESSION_COOKIE_SAMESITE="None", SESSION_COOKIE_SECURE=True, SESSION_COOKIE_HTTPONLY=True)
-CORS(app, origins=os.environ.get("FRONTEND_ORIGIN", "http://127.0.0.1:5500").split(","), supports_credentials=True)
+COOKIE_SECURE = os.environ.get("SESSION_COOKIE_SECURE", "true").lower() in {"1", "true", "yes"}
+app.config.update(
+    SESSION_COOKIE_SAMESITE="None",
+    SESSION_COOKIE_SECURE=COOKIE_SECURE,
+    SESSION_COOKIE_HTTPONLY=True,
+)
+ALLOWED_ORIGINS = [
+    origin.strip().rstrip("/")
+    for origin in os.environ.get("FRONTEND_ORIGIN", "http://127.0.0.1:5500").split(",")
+    if origin.strip()
+]
+CORS(app, origins=ALLOWED_ORIGINS, supports_credentials=True)
 
 API_KEY = os.environ.get("KITE_API_KEY", "")
 API_SECRET = os.environ.get("KITE_API_SECRET", "")
@@ -75,7 +85,7 @@ def auth_callback():
         return jsonify({"error": "session_exchange_failed", "message": "Kite session exchange failed. Check server logs and app redirect configuration."}), 502
     session["kite_access_token"] = data["access_token"]
     session["kite_user_id"] = data.get("user_id")
-    return redirect(os.environ.get("FRONTEND_SUCCESS_URL", "/"))
+    return redirect(os.environ.get("FRONTEND_SUCCESS_URL", "https://thiruroyal081-hub.github.io/ThiruTrader/"))
 
 
 @app.post("/auth/logout")
