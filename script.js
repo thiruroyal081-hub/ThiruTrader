@@ -1,16 +1,16 @@
 const STOCKS=[
-{name:"Reliance Industries",symbol:"RELIANCE",sector:"Energy",price:1462.50,change:1.24,high:1478.00,low:1439.20},
-{name:"HDFC Bank",symbol:"HDFCBANK",sector:"Banking",price:1748.30,change:.72,high:1761.40,low:1729.80},
-{name:"ICICI Bank",symbol:"ICICIBANK",sector:"Banking",price:1284.75,change:.48,high:1295.00,low:1270.10},
-{name:"Tata Consultancy Services",symbol:"TCS",sector:"IT",price:3892.10,change:-.35,high:3925.00,low:3860.50},
-{name:"Infosys",symbol:"INFY",sector:"IT",price:1543.80,change:.91,high:1558.60,low:1520.00},
-{name:"Bharti Airtel",symbol:"BHARTIARTL",sector:"Telecom",price:1845.25,change:1.12,high:1862.00,low:1810.20},
-{name:"Tata Motors",symbol:"TATAMOTORS",sector:"Auto",price:684.60,change:-.64,high:699.00,low:677.20},
-{name:"Mahindra & Mahindra",symbol:"M&M",sector:"Auto",price:2936.40,change:.82,high:2960.00,low:2892.00},
-{name:"ITC",symbol:"ITC",sector:"FMCG",price:412.75,change:.26,high:416.90,low:409.10},
-{name:"Hindustan Unilever",symbol:"HINDUNILVR",sector:"FMCG",price:2378.90,change:-.18,high:2398.00,low:2362.30},
-{name:"State Bank of India",symbol:"SBIN",sector:"Banking",price:812.60,change:1.05,high:821.40,low:801.00},
-{name:"NTPC",symbol:"NTPC",sector:"Energy",price:342.15,change:.37,high:346.00,low:338.20}
+{name:"Reliance Industries",symbol:"RELIANCE",sector:"Energy"},
+{name:"HDFC Bank",symbol:"HDFCBANK",sector:"Banking"},
+{name:"ICICI Bank",symbol:"ICICIBANK",sector:"Banking"},
+{name:"Tata Consultancy Services",symbol:"TCS",sector:"IT"},
+{name:"Infosys",symbol:"INFY",sector:"IT"},
+{name:"Bharti Airtel",symbol:"BHARTIARTL",sector:"Telecom"},
+{name:"Tata Motors",symbol:"TATAMOTORS",sector:"Auto"},
+{name:"Mahindra & Mahindra",symbol:"M&M",sector:"Auto"},
+{name:"ITC",symbol:"ITC",sector:"FMCG"},
+{name:"Hindustan Unilever",symbol:"HINDUNILVR",sector:"FMCG"},
+{name:"State Bank of India",symbol:"SBIN",sector:"Banking"},
+{name:"NTPC",symbol:"NTPC",sector:"Energy"}
 ];
 const $=id=>document.getElementById(id);
 const safeRead=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))??fallback}catch{return fallback}};
@@ -20,7 +20,7 @@ let selected=STOCKS[0], chart=null;
 const money=n=>"₹"+Number(n).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2});
 const pct=n=>(n>=0?"+":"")+n.toFixed(2)+"%";
 function backendBaseUrl(){
-  return (safeRead("thirut_trader_backend_url","")||"").trim().replace(/\/$/,"");
+  return (safeRead("thirut_trader_backend_url","https://thirutrader.onrender.com")||"https://thirutrader.onrender.com").trim().replace(/\/$/,"");
 }
 function validBackendUrl(value){
   try{
@@ -103,7 +103,7 @@ async function loadSelectedHistory(){
   }
 }
 function persist(){try{localStorage.setItem("thirut_trader_watchlist",JSON.stringify(watchlist));localStorage.setItem("thirut_trader_journal",JSON.stringify(journal))}catch{}}
-function renderStocks(){const q=$("stock-search").value.trim().toLowerCase(),sector=$("sector-filter").value;const filtered=STOCKS.filter(s=>(sector==="All"||s.sector===sector)&&[s.name,s.symbol,s.sector].some(x=>x.toLowerCase().includes(q)));$("stock-rows").innerHTML=filtered.map(s=>`<tr data-symbol="${s.symbol}" class="${s.symbol===selected.symbol?"selected":""} tabindex="0"><td><span class="stock-name">${s.name}</span><span class="stock-symbol">${s.symbol} · NSE</span></td><td class="price-cell">${s.providerData?money(s.price):"—"}</td><td><span class="change-pill ${s.providerData?(s.change>=0?"positive":"negative"):""}">${s.providerData?pct(s.change):"API needed"}</span></td><td><button class="star-button ${watchlist.includes(s.symbol)?"saved":""}" data-star="${s.symbol}" aria-label="Toggle ${s.symbol} watchlist">${watchlist.includes(s.symbol)?"★":"☆"}</button></td></tr>`).join("")||'<tr><td colspan="4">No matching stocks.</td></tr>';$("results-label").textContent=filtered.length+" sample stocks";$("watch-count").innerHTML=watchlist.length+' <small>stocks</small>'}
+function renderStocks(){const q=$("stock-search").value.trim().toLowerCase(),sector=$("sector-filter").value;const filtered=STOCKS.filter(s=>(sector==="All"||s.sector===sector)&&[s.name,s.symbol,s.sector].some(x=>x.toLowerCase().includes(q)));$("stock-rows").innerHTML=filtered.map(s=>`<tr data-symbol="${s.symbol}" class="${s.symbol===selected.symbol?"selected":""} tabindex="0"><td><span class="stock-name">${s.name}</span><span class="stock-symbol">${s.symbol} · NSE</span></td><td class="price-cell">${s.providerData?money(s.price):"—"}</td><td><span class="change-pill ${s.providerData?(s.change>=0?"positive":"negative"):""}">${s.providerData?pct(s.change):"Load history"}</span></td><td><button class="star-button ${watchlist.includes(s.symbol)?"saved":""}" data-star="${s.symbol}" aria-label="Toggle ${s.symbol} watchlist">${watchlist.includes(s.symbol)?"★":"☆"}</button></td></tr>`).join("")||'<tr><td colspan="4">No matching stocks.</td></tr>';$("results-label").textContent=filtered.length+" listed-stock choices";$("watch-count").innerHTML=watchlist.length+' <small>stocks</small>'}
 function selectStock(symbol){
   const s=STOCKS.find(x=>x.symbol===symbol);if(!s)return;
   selected=s;
@@ -172,7 +172,7 @@ function resetAnalysisPanel(){
   $("signal-reasons").innerHTML="<li>Configure the backend before running a historical analysis.</li>";
 }
 function toggleWatch(symbol){watchlist=watchlist.includes(symbol)?watchlist.filter(x=>x!==symbol):[...watchlist,symbol];persist();renderStocks();renderWatchlist();$("add-watch").textContent=watchlist.includes(selected.symbol)?"★":"☆";$("add-watch").classList.toggle("saved",watchlist.includes(selected.symbol))}
-function renderWatchlist(){$("watchlist-items").innerHTML=watchlist.map(sym=>{const s=STOCKS.find(x=>x.symbol===sym);if(!s)return"";return `<div class="watch-item"><button data-select="${s.symbol}"><span class="stock-name">${s.name}</span><span class="stock-symbol">${s.symbol}</span></button><div class="watch-price">${s.providerData?money(s.price):"—"}<small class="${s.providerData?(s.change>=0?"positive":"negative"):""}">${s.providerData?pct(s.change):"API needed"}</small></div></div>`}).join("")||'<div class="empty-state">No saved stocks. Use ☆ in the market table to add one.</div>';$("watch-count").innerHTML=watchlist.length+' <small>stocks</small>'}
+function renderWatchlist(){$("watchlist-items").innerHTML=watchlist.map(sym=>{const s=STOCKS.find(x=>x.symbol===sym);if(!s)return"";return `<div class="watch-item"><button data-select="${s.symbol}"><span class="stock-name">${s.name}</span><span class="stock-symbol">${s.symbol}</span></button><div class="watch-price">${s.providerData?money(s.price):"—"}<small class="${s.providerData?(s.change>=0?"positive":"negative"):""}">${s.providerData?pct(s.change):"Load history"}</small></div></div>`}).join("")||'<div class="empty-state">No saved stocks. Use ☆ in the market table to add one.</div>';$("watch-count").innerHTML=watchlist.length+' <small>stocks</small>'}
 function renderJournal(){$("journal-entries").innerHTML=journal.length?journal.slice().reverse().map((j,i)=>`<div class="journal-entry"><div><strong>${j.symbol} · ${j.side}</strong><small>${money(j.price)} · ${j.date}</small></div><button data-delete-journal="${journal.length-1-i}">Remove</button></div>`).join(""):'<div class="empty-state">No practice entries yet. Add one above.</div>'}
 document.addEventListener("click",e=>{const star=e.target.closest("[data-star]");if(star){e.stopPropagation();toggleWatch(star.dataset.star);return}const row=e.target.closest("tr[data-symbol]");if(row){selectStock(row.dataset.symbol);return}const pick=e.target.closest("[data-select]");if(pick){selectStock(pick.dataset.select);return}const del=e.target.closest("[data-delete-journal]");if(del){journal.splice(Number(del.dataset.deleteJournal),1);persist();renderJournal()}});
 document.addEventListener("keydown",e=>{if((e.key==="Enter"||e.key===" ")&&e.target.matches("tr[data-symbol]")){e.preventDefault();selectStock(e.target.dataset.symbol)}});
