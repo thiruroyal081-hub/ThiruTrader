@@ -39,7 +39,7 @@ The backend scaffold is in `app.py`; dependencies are in `requirements.txt`.
    ```
 3. Copy `.env.example` to `.env` and set a long, random `FLASK_SECRET_KEY`. Do not commit `.env`.
 4. Keep `KITE_API_KEY` and `KITE_API_SECRET` blank until valid API credentials are available. Store real values only in the backend environment—not in frontend JavaScript, GitHub files, or screenshots.
-5. For production cross-origin browser login, use HTTPS and set `FRONTEND_ORIGIN` to the exact GitHub Pages origin `https://thiruroyal081-hub.github.io` (origin only, no `/ThiruTrader/` path). Set `SESSION_COOKIE_SECURE=true` in production. For local HTTP development only, `.env.example` uses `SESSION_COOKIE_SECURE=false`. Test login/logout carefully.
+5. For production cross-origin browser login, use HTTPS and set `FRONTEND_ORIGIN` to the exact GitHub Pages origin `https://thiruroyal081-hub.github.io` (origin only, no `/ThiruTrader/` path). Set `SESSION_COOKIE_SECURE=true` and `SESSION_COOKIE_SAMESITE=None` in production HTTPS. For local HTTP development only, `.env.example` uses `SESSION_COOKIE_SECURE=false` and `SESSION_COOKIE_SAMESITE=Lax`. Browsers may block third-party cookies when the frontend and API are on different sites; if cross-site login fails, use a same-site frontend/backend deployment or a deliberately designed secure auth flow. Test login/logout carefully.
 6. Set the redirect URL in your Kite developer app to match `KITE_REDIRECT_URL`.
 7. Start the local API:
    ```bash
