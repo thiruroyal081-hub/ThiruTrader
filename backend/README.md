@@ -9,6 +9,8 @@ This backend adds **real calculations on provider-supplied historical equity can
 - The sample strategy is EMA20/EMA50 + RSI14 + MACD + volume confirmation.
 - Backtest trades are filled at the next candle's open after a prior-candle signal to reduce same-candle look-ahead. Costs are a simplified configurable basis-point estimate.
 - This backend does not use broker credentials or send orders. Real execution requires a supported broker API, user-specific authorization, secure token handling, testing, and compliance review.
+- Public API requests are rate-limited to 60 requests per minute per IP in each running process. This is a basic safeguard, not enterprise-grade abuse prevention.
+- The Render Blueprint restricts browser requests to `https://thiruroyal081-hub.github.io`. If your frontend uses another origin, update `ALLOWED_ORIGINS` to the exact HTTPS origin; separate multiple origins with commas.
 
 ## Run locally on a Mac
 
