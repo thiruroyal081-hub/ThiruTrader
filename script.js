@@ -106,7 +106,11 @@ function sampleHistory(stock){
     const range=stock.price*(.002+(seed/233280)*.008);
     rows.push({open:close-noise*.35,high:close+range,low:Math.max(.01,close-range),close,volume});
   }
-  rows[rows.length-1].close=stock.price;
+  // Keep the final synthetic OHLC candle internally consistent after anchoring its close.
+  const last=rows[rows.length-1];
+  last.close=stock.price;
+  last.high=Math.max(last.high,last.open,last.close);
+  last.low=Math.max(.01,Math.min(last.low,last.open,last.close));
   return rows;
 }
 function ema(values,period){
@@ -141,22 +145,27 @@ function calculateSignal(stock){
   const macd=validMacd.at(-1),macdSignal=signalLine.at(-1),macdPrevious=validMacd.at(-2),signalPrevious=signalLine.at(-2);
   const r=rsi(closes),recentVolume=volumes.at(-1),avgVolume=volumes.slice(-21,-1).reduce((a,b)=>a+b,0)/20;
   const volumeUp=recentVolume>avgVolume,trendUp=e20>e50,trendDown=e20<e50;
+  const lastClose=closes.at(-1),priorClose=closes.at(-2);
+  const priceUp=lastClose>priorClose,priceDown=lastClose<priorClose;
   const momentumUp=r>=50&&r<70,momentumDown=r<50;
   const macdUp=macd>macdSignal,macdDown=macd<macdSignal;
-  const bullishVotes=[trendUp,momentumUp,macdUp,volumeUp].filter(Boolean).length;
-  const bearishVotes=[trendDown,momentumDown,macdDown,volumeUp].filter(Boolean).length;
+  // High volume is directional only when paired with the candle's direction.
+  const volumeBullish=volumeUp&&priceUp,volumeBearish=volumeUp&&priceDown;
+  const bullishVotes=[trendUp,momentumUp,macdUp,volumeBullish].filter(Boolean).length;
+  const bearishVotes=[trendDown,momentumDown,macdDown,volumeBearish].filter(Boolean).length;
   let signal="HOLD / NO TRADE",tone="neutral",summary="The indicators are mixed. Wait for clearer confirmation rather than forcing a direction.";
   let score=Math.max(bullishVotes,bearishVotes),scoreDirection=bullishVotes>bearishVotes?"bullish":bearishVotes>bullishVotes?"bearish":"mixed";
-  if(bullishVotes>=3&&trendUp&&momentumUp&&macdUp){signal="BUY CANDIDATE";tone="buy";score=bullishVotes;scoreDirection="bullish";summary="At least three rule checks align upward in this synthetic sample. This is a demo result, not a trade instruction."}
-  else if(bearishVotes>=3&&trendDown&&momentumDown&&macdDown){signal="SELL / EXIT CANDIDATE";tone="sell";score=bearishVotes;scoreDirection="bearish";summary="At least three rule checks align downward in this synthetic sample. This is a demo result, not a trade instruction."}
+  if(bullishVotes>=3&&trendUp&&momentumUp&&macdUp){signal="BUY CANDIDATE";tone="buy";score=bullishVotes;scoreDirection="bullish";summary="Trend, momentum and MACD align upward in this synthetic sample. This is a demo result, not a trade instruction."}
+  else if(bearishVotes>=3&&trendDown&&momentumDown&&macdDown){signal="SELL / EXIT CANDIDATE";tone="sell";score=bearishVotes;scoreDirection="bearish";summary="Trend, momentum and MACD align downward in this synthetic sample. This is a demo result, not a trade instruction."}
   const reasons=[
     (trendUp?"EMA trend is bullish (EMA 20 above EMA 50).":trendDown?"EMA trend is bearish (EMA 20 below EMA 50).":"EMA trend is mixed."),
     (r>=70?"RSI is 70 or higher: momentum may be stretched.":r<=30?"RSI is 30 or lower: downside may be stretched.":r>=50?"RSI is above 50, supporting positive momentum.":"RSI is below 50, indicating weaker momentum."),
     (macdUp?"MACD is above its signal line.":macdDown?"MACD is below its signal line.":"MACD and signal line are equal."),
-    (volumeUp?"Sample volume is above its 20-period average.":"Sample volume does not confirm the move."),
+    (volumeBullish?"Sample volume is above average on an up candle.":volumeBearish?"Sample volume is above average on a down candle.":volumeUp?"Sample volume is above average, but candle direction is not a clear confirmation.":"Sample volume is not above its 20-period average."),
+    "Signal score counts directional rule checks; it is not a probability or a measured win rate.",
     "This run uses generated sample candles, not actual NSE/BSE history."
   ];
-  return {symbol:stock.symbol,signal,tone,summary,score,scoreDirection,bullishVotes,bearishVotes,ema20:e20,ema50:e50,rsi:r,macd,macdSignal,macdCrossUp:macdPrevious<=signalPrevious&&macd>macdSignal,macdCrossDown:macdPrevious>=signalPrevious&&macd<macdSignal,volumeUp,reasons,time:new Date().toLocaleString("en-IN"),timeframe:"Daily (sample)"};
+  return {symbol:stock.symbol,signal,tone,summary,score,scoreDirection,bullishVotes,bearishVotes,ema20:e20,ema50:e50,rsi:r,macd,macdSignal,macdCrossUp:macdPrevious<=signalPrevious&&macd>macdSignal,macdCrossDown:macdPrevious>=signalPrevious&&macd<macdSignal,volumeUp,volumeBullish,volumeBearish,reasons,time:new Date().toLocaleString("en-IN"),timeframe:"Daily (sample)"};
 }
 function renderSignalHistory(){
   const history=safeRead("thirut_trader_signal_history",[]);
@@ -175,10 +184,11 @@ function runAnalysis(){
   $("indicator-rsi-note").textContent=result.rsi>=70?"Potentially overbought":result.rsi<=30?"Potentially oversold":result.rsi>=50?"Positive momentum":"Weak momentum";
   $("indicator-macd").textContent=result.macdCrossUp?"Bullish crossover":result.macdCrossDown?"Bearish crossover":result.macd>result.macdSignal?"Above signal line":"Below signal line";
   $("indicator-macd-note").textContent="MACD "+result.macd.toFixed(2)+" · Signal "+result.macdSignal.toFixed(2);
-  $("indicator-volume").textContent=result.volumeUp?"Above average":"Not confirmed";
-  $("indicator-volume-note").textContent="Sample volume vs 20-period average";
+  $("indicator-volume").textContent=result.volumeBullish?"Bullish confirmation":result.volumeBearish?"Bearish confirmation":result.volumeUp?"Above average only":"Not confirmed";
+  $("indicator-volume-note").textContent="Synthetic volume + candle direction";
   $("signal-reasons").innerHTML=result.reasons.map(x=>`<li>${x}</li>`).join("");
   let history=safeRead("thirut_trader_signal_history",[]);
+  if(!Array.isArray(history))history=[];
   history.push({symbol:result.symbol,signal:result.signal,tone:result.tone,score:result.score,time:result.time,timeframe:result.timeframe,scoreDirection:result.scoreDirection});
   try{localStorage.setItem("thirut_trader_signal_history",JSON.stringify(history.slice(-30)))}catch{}
   renderSignalHistory();
