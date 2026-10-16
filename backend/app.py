@@ -5,11 +5,15 @@ import pandas as pd
 import yfinance as yf
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 app = Flask(__name__)
 # This API serves public market-history/strategy results only. It does not accept broker secrets.
 allowed_origins = os.getenv("ALLOWED_ORIGINS", "*")
 CORS(app, resources={r"/api/*": {"origins": allowed_origins.split(",") if allowed_origins != "*" else "*"}})
+# Public learning API: keep accidental/repeated requests from exhausting the upstream data provider.
+limiter = Limiter(get_remote_address, app=app, default_limits=["60 per minute"], storage_uri="memory://")
 
 SYMBOLS = {
     "RELIANCE": "RELIANCE.NS", "HDFCBANK": "HDFCBANK.NS",
@@ -102,6 +106,7 @@ def json_safe(value):
 
 
 @app.get("/api/health")
+@limiter.exempt
 def health():
     return jsonify({
         "ok": True,
