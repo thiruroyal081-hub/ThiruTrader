@@ -4,3 +4,26 @@
 
 .connection-panel{margin:16px 0}.connection-controls{display:grid;grid-template-columns:minmax(220px,1fr) auto auto auto;align-items:end;gap:9px;margin-top:15px}.backend-url-field{display:grid;gap:6px;color:#a0adc4;font-size:10px}.backend-url-field input{width:100%;min-width:0;background:#0d1424;border:1px solid #2a354c;color:var(--text);border-radius:7px;padding:10px;font-size:11px}.secondary-button{border:1px solid #39445b;color:#c3cee2;background:#151e32;border-radius:7px;font-size:10px;font-weight:650;padding:11px 12px;white-space:nowrap}.connection-message{font-size:11px;line-height:1.5;color:#b6c4dd;margin:12px 0 0}.connection-success{color:var(--green)}.connection-warning{color:#f1ce81}.connection-footnote{font-size:10px;line-height:1.6;color:#8996af;margin:8px 0 0}
 @media(max-width:1100px){.connection-controls{grid-template-columns:1fr 1fr}.backend-url-field{grid-column:1/-1}}@media(max-width:700px){.connection-controls{grid-template-columns:1fr}.backend-url-field{grid-column:auto}.connection-controls button{width:100%}}
+
+
+/* Historical API and backtest additions */
+.connection-panel,.backtest-panel{scroll-margin-top:20px}
+.connection-controls{flex-wrap:wrap}
+.connection-controls button:disabled,.primary-button:disabled{opacity:.55;cursor:wait}
+.backtest-form{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:18px 0}
+.backtest-form label{display:grid;gap:7px;color:var(--muted);font-size:11px}
+.backtest-form input,.backtest-form select{width:100%;min-width:0;background:var(--panel2);border:1px solid var(--line);border-radius:8px;color:var(--text);padding:11px}
+.backtest-form button{align-self:end;min-height:39px}
+.backtest-results{margin-top:16px}
+.backtest-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.backtest-metric{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:13px;min-width:0}
+.backtest-metric small,.backtest-metric strong{display:block}
+.backtest-metric small{font-size:10px;color:var(--muted);margin-bottom:8px}
+.backtest-metric strong{font-size:17px;overflow-wrap:anywhere}
+.backtest-trades{margin-top:18px}
+.backtest-trades>strong{display:block;margin-bottom:10px}
+.backtest-trade{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:14px;align-items:center;border-top:1px solid var(--line);padding:10px 0;font-size:11px}
+.backtest-trade span:first-child{color:var(--muted)}
+.backtest-limits{color:var(--muted);font-size:11px;line-height:1.7;padding-left:18px;margin-top:15px}
+@media(max-width:900px){.backtest-form{grid-template-columns:repeat(2,minmax(0,1fr))}.backtest-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:520px){.backtest-form{grid-template-columns:1fr}.backtest-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.backtest-trade{grid-template-columns:1fr auto;gap:5px}.backtest-trade strong{grid-column:2;grid-row:1}}
