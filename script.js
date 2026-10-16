@@ -22,6 +22,12 @@ const pct=n=>(n>=0?"+":"")+n.toFixed(2)+"%";
 function backendBaseUrl(){
   return (safeRead("thirut_trader_backend_url","")||"").trim().replace(/\/$/,"");
 }
+function validBackendUrl(value){
+  try{
+    const url=new URL(value);
+    return url.protocol==="https:"||(url.protocol==="http:"&&["localhost","127.0.0.1"].includes(url.hostname));
+  }catch{return false}
+}
 function setKiteMessage(message,tone="neutral"){
   const el=$("kite-connection-message");if(!el)return;
   el.textContent=message;el.className="connection-message connection-"+tone;
@@ -29,6 +35,7 @@ function setKiteMessage(message,tone="neutral"){
 async function checkKiteStatus(){
   const base=backendBaseUrl();
   if(!base){setKiteMessage("Enter your separately hosted Flask backend URL first.");$("kite-status-badge").textContent="NOT CONFIGURED";return null}
+  if(!validBackendUrl(base)){setKiteMessage("Use an HTTPS backend URL. HTTP is allowed only for localhost development.","warning");$("kite-status-badge").textContent="INVALID URL";return null}
   setKiteMessage("Checking backend…");
   try{
     const response=await fetch(base+"/api/health",{credentials:"include"});
@@ -55,6 +62,7 @@ async function connectKite(){
 async function refreshSelectedQuote(){
   const base=backendBaseUrl();
   if(!base){setKiteMessage("Configure your backend URL first.","warning");return}
+  if(!validBackendUrl(base)){setKiteMessage("Use an HTTPS backend URL. HTTP is allowed only for localhost development.","warning");return}
   setKiteMessage("Requesting a quote for "+selected.symbol+"…");
   try{
     const response=await fetch(base+"/api/quote?i="+encodeURIComponent("NSE:"+selected.symbol),{credentials:"include"});
@@ -62,18 +70,22 @@ async function refreshSelectedQuote(){
     if(!response.ok)throw new Error(data.message||data.error||"Quote request failed. Connect Kite first.");
     const quote=data["NSE:"+selected.symbol];
     if(!quote||!Number.isFinite(Number(quote.last_price)))throw new Error("No quote returned for this symbol. Check the NSE symbol and Kite access.");
-    const oldPrice=selected.price;
     selected.price=Number(quote.last_price);
-    if(Number.isFinite(Number(quote.net_change))&&oldPrice>0)selected.change=Number(quote.net_change)/Math.max(.01,selected.price-Number(quote.net_change))*100;
+    const previousClose=Number(quote.ohlc?.close);
+    if(Number.isFinite(previousClose)&&previousClose>0)selected.change=((selected.price-previousClose)/previousClose)*100;
+    else if(Number.isFinite(Number(quote.net_change)))selected.change=Number(quote.net_change)/Math.max(.01,selected.price-Number(quote.net_change))*100;
     if(quote.ohlc){if(Number.isFinite(Number(quote.ohlc.high)))selected.high=Number(quote.ohlc.high);if(Number.isFinite(Number(quote.ohlc.low)))selected.low=Number(quote.ohlc.low)}
     $("selected-price").textContent=money(selected.price);$("selected-change").textContent=pct(selected.change);
     $("selected-change").className=selected.change>=0?"positive":"negative";
     $("selected-high").textContent=money(selected.high);$("selected-low").textContent=money(selected.low);
     $("selected-symbol").textContent=selected.symbol+" · NSE · KITE QUOTE SNAPSHOT";
-    $("market-data-label").textContent="MARKET DATA: KITE SNAPSHOT";
+    $("market-data-label").textContent="SELECTED QUOTE: KITE SNAPSHOT";
+    $("market-data-notice").innerHTML='<span class="notice-icon">i</span><div><strong>One quote snapshot received.</strong> Only the selected stock quote was refreshed. Other stock rows, index cards, chart candles and technical-analysis candles remain sample data.</div>';
+    $("table-data-note").textContent="Selected quote snapshot; other rows sample";
+    resetAnalysisPanel();
     renderStocks();renderWatchlist();
     $("kite-status-badge").textContent="LIVE QUOTE RECEIVED";
-    setKiteMessage("Quote received for NSE:"+selected.symbol+". This refresh is a quote snapshot; the chart and technical signals still use sample candles until historical-data integration is completed.","success");
+    setKiteMessage("Quote snapshot received for NSE:"+selected.symbol+(quote.timestamp?" · last traded "+quote.timestamp:"")+". It does not stream or auto-refresh. Chart and technical signals still use sample candles.","success");
   }catch(error){setKiteMessage(error.message+" Sample values have not been replaced.","warning")}
 }
 function persist(){try{localStorage.setItem("thirut_trader_watchlist",JSON.stringify(watchlist));localStorage.setItem("thirut_trader_journal",JSON.stringify(journal))}catch{}}
@@ -195,4 +207,4 @@ $("add-watch").addEventListener("click",()=>toggleWatch(selected.symbol));
 $("journal-form").addEventListener("submit",e=>{e.preventDefault();const symbol=$("journal-symbol").value.trim().toUpperCase();const price=Number($("journal-price").value);if(!/^[A-Z0-9.&-]{1,20}$/.test(symbol)){ $("journal-symbol").setCustomValidity("Use a stock symbol with letters, numbers, dots, ampersands, or hyphens only."); $("journal-symbol").reportValidity(); return; } $("journal-symbol").setCustomValidity(""); if(!symbol||!Number.isFinite(price)||price<=0)return;journal.push({symbol,side:$("journal-side").value,price,date:new Date().toLocaleDateString("en-IN")});persist();renderJournal();e.target.reset()});
 document.querySelectorAll("[data-view]").forEach(b=>b.addEventListener("click",()=>{document.querySelectorAll("[data-view]").forEach(n=>n.classList.toggle("active",n===b));const target={overview:"market-section",watchlist:"watch-section",analysis:"analysis-section",journal:"journal-section"}[b.dataset.view];$(target).scrollIntoView({behavior:"smooth",block:"start"})}));
 $("today-label").textContent="INDIA · "+new Date().toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"}).toUpperCase();
-renderStocks();renderWatchlist();renderJournal();renderSignalHistory();$("backend-url").value=backendBaseUrl();$("backend-url").addEventListener("change",()=>{const value=$("backend-url").value.trim().replace(/\/$/,"");try{localStorage.setItem("thirut_trader_backend_url",JSON.stringify(value))}catch{}$("backend-url").value=value});$("check-kite-status").addEventListener("click",checkKiteStatus);$("connect-kite").addEventListener("click",connectKite);$("refresh-live-quote").addEventListener("click",refreshSelectedQuote);$("run-analysis").addEventListener("click",runAnalysis);$("clear-signal-history").addEventListener("click",()=>{try{localStorage.removeItem("thirut_trader_signal_history")}catch{}renderSignalHistory()});selectStock(selected.symbol);if(backendBaseUrl())checkKiteStatus();
+renderStocks();renderWatchlist();renderJournal();renderSignalHistory();$("backend-url").value=backendBaseUrl();$("backend-url").addEventListener("change",()=>{const value=$("backend-url").value.trim().replace(/\/$/,"");$("backend-url").value=value;if(value&&!validBackendUrl(value)){setKiteMessage("Use an HTTPS backend URL. HTTP is allowed only for localhost development.","warning");return}try{localStorage.setItem("thirut_trader_backend_url",JSON.stringify(value))}catch{}});$("check-kite-status").addEventListener("click",checkKiteStatus);$("connect-kite").addEventListener("click",connectKite);$("refresh-live-quote").addEventListener("click",refreshSelectedQuote);$("run-analysis").addEventListener("click",runAnalysis);$("clear-signal-history").addEventListener("click",()=>{try{localStorage.removeItem("thirut_trader_signal_history")}catch{}renderSignalHistory()});selectStock(selected.symbol);if(backendBaseUrl())checkKiteStatus();
