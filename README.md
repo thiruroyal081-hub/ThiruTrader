@@ -5,12 +5,15 @@ A responsive NSE/BSE equities dashboard prototype with a prepared Python Flask b
 ## Frontend features
 - Stock search and sector filters
 - Illustrative stock charts and example index values
+- Rule-based EMA 20/50, RSI 14, MACD and volume analysis using generated sample history
+- Explainable BUY candidate / SELL candidate / HOLD signals and browser-local signal history
 - Browser-local watchlist
 - Practice trade journal saved in the current browser
 - Responsive dark dashboard
 
 ## Important limitations
-- **All displayed prices, index values, and chart points are sample data, not live quotes.**
+- **All displayed prices, index values, chart points, and analysis history are sample/illustrative data, not live quotes or validated trading signals.**
+- The signal engine is an educational rules demo. Its generated sample history must not be used for real trading decisions.
 - The current frontend does not call the Flask backend.
 - No broker account is connected and no real orders are placed.
 - Watchlist and journal data stay in the current browser's local storage.
