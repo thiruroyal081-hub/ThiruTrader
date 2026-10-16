@@ -231,10 +231,10 @@ def backtest():
                 shares = 0
                 entry_price = 0
                 entry_fee = 0
-            mark = cash + shares * float(next_row["close"])
+            mark = cash + shares * float(next_row["close"]) * (1 - cost_rate)
             equity_curve.append({"date": next_date.isoformat(), "equity": round(mark, 2)})
         final_close = float(data.iloc[-1]["close"])
-        final_equity = cash + shares * final_close
+        final_equity = cash + shares * final_close * (1 - cost_rate)
         if shares:
             pnl = (final_close - entry_price) * shares - entry_fee - shares * final_close * cost_rate
             trades.append({"entry_date": entry_date, "exit_date": "OPEN POSITION (marked to final close)",
