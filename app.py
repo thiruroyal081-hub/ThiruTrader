@@ -16,7 +16,7 @@ app.secret_key = SECRET_KEY
 # Cross-site browser sessions require HTTPS in production when frontend and API use different hosts.
 COOKIE_SECURE = os.environ.get("SESSION_COOKIE_SECURE", "true").lower() in {"1", "true", "yes"}
 app.config.update(
-    SESSION_COOKIE_SAMESITE="None",
+    SESSION_COOKIE_SAMESITE=os.environ.get("SESSION_COOKIE_SAMESITE", "None" if COOKIE_SECURE else "Lax"),
     SESSION_COOKIE_SECURE=COOKIE_SECURE,
     SESSION_COOKIE_HTTPONLY=True,
 )
