@@ -17,6 +17,7 @@
       <div class="nav-label">WORKSPACE</div>
       <button class="nav-item active" data-view="overview"><span>▦</span> Overview</button>
       <button class="nav-item" data-view="watchlist"><span>☆</span> My watchlist</button>
+      <button class="nav-item" data-view="analysis"><span>⌁</span> Stock analysis</button>
       <button class="nav-item" data-view="journal"><span>▤</span> Trade journal</button>
       <div class="sidebar-bottom"><div class="connection-dot"></div><div><strong>Sample mode</strong><small>No broker connected</small></div></div>
     </aside>
@@ -52,6 +53,25 @@
           <div class="chart-legend"><span><i class="legend-line"></i> Sample price movement</span><span>Not for trading decisions</span></div>
           <div class="detail-divider"></div>
           <div class="quick-stats"><div><span>Sector</span><strong id="selected-sector">Energy</strong></div><div><span>Session high</span><strong id="selected-high">₹1,478.00</strong></div><div><span>Session low</span><strong id="selected-low">₹1,439.20</strong></div></div>
+        </article>
+      </section>
+      <section class="analysis-grid" id="analysis-section">
+        <article class="panel analysis-panel">
+          <div class="panel-heading"><div><h2>Technical analysis & signals</h2><p>Rule-based indicators calculated from illustrative sample history</p></div><span class="mini-tag">SAMPLE ONLY</span></div>
+          <div class="analysis-toolbar"><div class="analysis-selected"><span class="stock-symbol">SELECTED STOCK</span><strong id="analysis-symbol">RELIANCE</strong></div><label>Analysis timeframe<select id="analysis-timeframe"><option value="Daily">Daily</option><option value="Swing">Swing (daily data)</option></select></label><button class="primary-button" id="run-analysis" type="button">Analyze selected stock</button></div>
+          <div class="signal-banner signal-neutral" id="signal-banner"><div><span class="signal-kicker">RULE-BASED RESULT</span><strong id="signal-label">HOLD / NO TRADE</strong><p id="signal-summary">Run an analysis to calculate sample indicators.</p></div><div class="signal-score"><strong id="signal-score">—</strong><span>rule score</span></div></div>
+          <div class="indicator-grid">
+            <div class="indicator-card"><span>EMA 20 / EMA 50</span><strong id="indicator-trend">—</strong><small id="indicator-ema">Waiting for analysis</small></div>
+            <div class="indicator-card"><span>RSI (14)</span><strong id="indicator-rsi">—</strong><small id="indicator-rsi-note">Momentum</small></div>
+            <div class="indicator-card"><span>MACD</span><strong id="indicator-macd">—</strong><small id="indicator-macd-note">Momentum confirmation</small></div>
+            <div class="indicator-card"><span>Volume</span><strong id="indicator-volume">—</strong><small id="indicator-volume-note">Compared with recent average</small></div>
+          </div>
+          <div class="signal-reasons"><strong>Why this result?</strong><ul id="signal-reasons"><li>No analysis run yet.</li></ul></div>
+          <div class="signal-disclaimer">Educational prototype. Sample history is generated for testing, not real market data. Signals are not recommendations and can be wrong. No live quotes or orders are connected.</div>
+        </article>
+        <article class="panel signal-history-panel">
+          <div class="panel-heading"><div><h2>Signal history</h2><p>Saved in this browser when you run analysis</p></div><button class="text-button" id="clear-signal-history" type="button">Clear</button></div>
+          <div id="signal-history" class="signal-history"><div class="empty-state">No saved analyses yet.</div></div>
         </article>
       </section>
       <section class="bottom-grid">
